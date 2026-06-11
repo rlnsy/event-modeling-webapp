@@ -522,6 +522,28 @@ summary.add-btn::marker { content: ""; }
 }
 .slice-head-main { min-width: 0; }
 
+.slice-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+/* ◀ / ▶ slice reorder buttons. */
+.slice-reorder { display: flex; gap: 4px; }
+.reorder-btn {
+  background: rgba(137, 180, 250, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(137, 180, 250, 0.3);
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.reorder-btn:hover:not(:disabled) { background: rgba(137, 180, 250, 0.2); }
+.reorder-btn:disabled { opacity: 0.35; cursor: default; }
+
 .add-menu { position: relative; flex: 0 0 auto; }
 .add-menu-list {
   position: absolute;

@@ -494,6 +494,61 @@
     validate();
   }
 
+  // Slices in display order: by `index` when present, else array position.
+  // Returns `{ s, i }` pairs where `i` is the original array position.
+  function orderedSlices(slices) {
+    return slices
+      .map((s, i) => ({ s, i }))
+      .sort((a, b) => {
+        const ai = Number.isInteger(a.s && a.s.index) ? a.s.index : a.i;
+        const bi = Number.isInteger(b.s && b.s.index) ? b.s.index : b.i;
+        return ai - bi;
+      });
+  }
+
+  // Move a slice one position left (dir -1) or right (dir +1) in display order,
+  // then normalize every slice's `index` to its new 0..N-1 position. The `s`
+  // objects are references into `model.slices`, so mutating `s.index` mutates
+  // the model directly.
+  function moveSlice(sliceId, sliceIdx, dir) {
+    const model = modelForEditing();
+    if (model == null) {
+      setStatus("err", "Resolve JSON errors before reordering", "");
+      return;
+    }
+    const slices = Array.isArray(model.slices) ? model.slices : [];
+    const ordered = orderedSlices(slices);
+    const pos = ordered.findIndex(({ s, i }) =>
+      (sliceId != null && s && s.id === sliceId) || i === sliceIdx);
+    const target = pos + dir;
+    if (pos < 0 || target < 0 || target >= ordered.length) return;
+    const tmp = ordered[pos];
+    ordered[pos] = ordered[target];
+    ordered[target] = tmp;
+    ordered.forEach(({ s }, idx) => { if (s) s.index = idx; });
+    commitModel(model);
+  }
+
+  // ◀ / ▶ controls in the slice header. The leftmost slice's ◀ and the
+  // rightmost slice's ▶ are disabled.
+  function sliceReorderControls(sliceId, sliceIdx, pos, total) {
+    const wrap = document.createElement("div");
+    wrap.className = "slice-reorder";
+    const mk = (label, dir, disabled, titleText) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "reorder-btn";
+      b.textContent = label;
+      b.title = titleText;
+      b.disabled = disabled;
+      b.addEventListener("click", () => moveSlice(sliceId, sliceIdx, dir));
+      return b;
+    };
+    wrap.appendChild(mk("◀", -1, pos === 0, "Move left"));
+    wrap.appendChild(mk("▶", +1, pos === total - 1, "Move right"));
+    return wrap;
+  }
+
   // Resolve a slice in `model` by id, falling back to its array position.
   function findSlice(model, sliceId, sliceIdx) {
     const slices = Array.isArray(model.slices) ? model.slices : [];
@@ -542,6 +597,7 @@
       }
       if (type === "slice") {
         if (!Array.isArray(model.slices)) model.slices = [];
+        obj.index = model.slices.length;
         model.slices.push(obj);
       } else {
         const slice = findSlice(model, sliceId, sliceIdx);
@@ -613,18 +669,12 @@
     }
 
     // Render in `index` order when present, else input order.
-    const ordered = slices
-      .map((s, i) => ({ s, i }))
-      .sort((a, b) => {
-        const ai = Number.isInteger(a.s && a.s.index) ? a.s.index : a.i;
-        const bi = Number.isInteger(b.s && b.s.index) ? b.s.index : b.i;
-        return ai - bi;
-      });
+    const ordered = orderedSlices(slices);
 
     const row = document.createElement("div");
     row.className = "preview-row";
 
-    for (const { s, i } of ordered) {
+    ordered.forEach(({ s, i }, pos) => {
       const slice = s || {};
       const col = document.createElement("div");
       col.className = "slice-column";
@@ -642,7 +692,11 @@
       meta.textContent = [slice.sliceType, slice.status].filter(Boolean).join(" · ");
       if (meta.textContent) headMain.appendChild(meta);
       header.appendChild(headMain);
-      header.appendChild(sliceAddMenu(slice.id, i));
+      const headActions = document.createElement("div");
+      headActions.className = "slice-head-actions";
+      headActions.appendChild(sliceReorderControls(slice.id, i, pos, ordered.length));
+      headActions.appendChild(sliceAddMenu(slice.id, i));
+      header.appendChild(headActions);
       col.appendChild(header);
 
       for (const laneDef of LANES) {
@@ -674,7 +728,7 @@
       }
 
       row.appendChild(col);
-    }
+    });
 
     preview.appendChild(row);
   }

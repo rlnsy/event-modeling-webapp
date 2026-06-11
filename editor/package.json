@@ -2,7 +2,8 @@
   "name": "editor",
   "private": true,
   "scripts": {
-    "dev": "http-server . -p 8080 -c-1 -o"
+    "dev": "http-server . -p 8080 -c-1 -o",
+    "check": "node --check app.js && node --check forms.js && node --check schema.js && node --check sessions.js"
   },
   "devDependencies": {
     "http-server": "^14.1.1"
