@@ -494,14 +494,46 @@
     validate();
   }
 
+  // Resolve a slice in `model` by id, falling back to its array position.
+  function findSlice(model, sliceId, sliceIdx) {
+    const slices = Array.isArray(model.slices) ? model.slices : [];
+    return slices.find((s) => s && sliceId != null && s.id === sliceId) || slices[sliceIdx];
+  }
+
+  // Non-generated fields from every event in the slice, deduped by name. These
+  // seed the "copy fields from event" button when adding a command.
+  function eventFieldsOf(slice) {
+    const out = [];
+    const seen = new Set();
+    if (!slice) return out;
+    for (const ev of (Array.isArray(slice.events) ? slice.events : [])) {
+      for (const f of (ev && Array.isArray(ev.fields) ? ev.fields : [])) {
+        if (f && f.name && !f.generated && !seen.has(f.name)) {
+          seen.add(f.name);
+          out.push(f);
+        }
+      }
+    }
+    return out;
+  }
+
   // Open the add-form for `type`, targeting the slice identified by `sliceId`
   // (falling back to `sliceIdx` if the slice has no id). `type === "slice"`
   // appends to the top-level slices array instead.
   function startAdd(type, sliceId, sliceIdx) {
-    if (modelForEditing() == null) {
+    const snapshot = modelForEditing();
+    if (snapshot == null) {
       setStatus("err", "Resolve JSON errors before adding", "");
       return;
     }
+
+    // Commands can pull their (non-generated) fields from the slice's event.
+    let options = null;
+    if (type === "command") {
+      const fields = eventFieldsOf(findSlice(snapshot, sliceId, sliceIdx));
+      if (fields.length) options = { copyFromFields: fields };
+    }
+
     AddForms.open(type, (obj) => {
       const model = modelForEditing();
       if (model == null) {
@@ -512,10 +544,7 @@
         if (!Array.isArray(model.slices)) model.slices = [];
         model.slices.push(obj);
       } else {
-        const slices = Array.isArray(model.slices) ? model.slices : [];
-        const slice =
-          slices.find((s) => s && sliceId != null && s.id === sliceId) ||
-          slices[sliceIdx];
+        const slice = findSlice(model, sliceId, sliceIdx);
         if (!slice) {
           setStatus("err", "Could not find the target slice", "");
           return;
@@ -525,7 +554,7 @@
         slice[key].push(obj);
       }
       commitModel(model);
-    });
+    }, options);
   }
 
   // A per-slice "+ Add" disclosure menu listing every addable element type.

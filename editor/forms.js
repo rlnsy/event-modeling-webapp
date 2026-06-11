@@ -163,7 +163,8 @@
   // Append one field row to `rowsEl`, tracking it in `rows` so submit can read
   // it and the row's × button can remove it. `showGenerated` adds the "gen"
   // toggle, which only makes sense for event fields (system-produced values).
-  function addFieldRow(rowsEl, rows, showGenerated) {
+  // `initial` pre-populates the row (used when copying fields from an event).
+  function addFieldRow(rowsEl, rows, showGenerated, initial) {
     const row = document.createElement("div");
     row.className = "field-row";
 
@@ -210,9 +211,18 @@
       row.remove();
     });
 
+    if (initial) {
+      if (initial.name) name.value = initial.name;
+      if (initial.type) type.value = initial.type;
+      if (initial.cardinality) card.value = initial.cardinality;
+      opt.cb.checked = !!initial.optional;
+      idf.cb.checked = !!initial.idAttribute;
+      if (gen) gen.cb.checked = !!initial.generated;
+    }
+
     rows.push(entry);
     rowsEl.appendChild(row);
-    name.focus();
+    if (!initial) name.focus();
   }
 
   // Gather field rows into schema-valid Field objects, dropping nameless rows
@@ -253,9 +263,12 @@
   }
 
   // Render the form for `type` and call onSubmit(builtObject) when accepted.
-  function open(type, onSubmit) {
+  // `options.copyFromFields` (an array of Field objects) adds a "copy fields"
+  // button to the field editor that seeds rows from those fields.
+  function open(type, onSubmit, options) {
     const specs = SPECS[type];
     if (!specs) return;
+    const opts = options || {};
 
     titleEl.textContent = "Add " + (TYPE_TITLES[type] || type);
     bodyEl.innerHTML = "";
@@ -279,12 +292,35 @@
 
         const rows = [];
         const showGenerated = type === "event";
+
+        const actions = document.createElement("div");
+        actions.className = "field-actions";
         const addBtn = document.createElement("button");
         addBtn.type = "button";
         addBtn.className = "add-field-btn";
         addBtn.textContent = "+ Add field";
         addBtn.addEventListener("click", () => addFieldRow(rowsEl, rows, showGenerated));
-        section.appendChild(addBtn);
+        actions.appendChild(addBtn);
+
+        // Copy fields seeded by the host (e.g. a command pulling its event's
+        // fields). Skips names already present so it's safe to click twice.
+        const copyFields = Array.isArray(opts.copyFromFields) ? opts.copyFromFields : [];
+        if (copyFields.length) {
+          const copyBtn = document.createElement("button");
+          copyBtn.type = "button";
+          copyBtn.className = "add-field-btn";
+          copyBtn.textContent = "Copy fields from event";
+          copyBtn.addEventListener("click", () => {
+            const present = new Set(rows.map((r) => r.read().name).filter(Boolean));
+            for (const f of copyFields) {
+              if (present.has(f.name)) continue;
+              addFieldRow(rowsEl, rows, showGenerated, f);
+              present.add(f.name);
+            }
+          });
+          actions.appendChild(copyBtn);
+        }
+        section.appendChild(actions);
 
         readers[spec.key] = () => collectFields(rows);
         bodyEl.appendChild(section);

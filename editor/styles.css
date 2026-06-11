@@ -655,6 +655,11 @@ input[type="checkbox"].form-input {
 }
 .field-remove:hover { background: var(--line); color: var(--err); }
 
+.field-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .add-field-btn {
   align-self: flex-start;
   background: rgba(137, 180, 250, 0.1);
