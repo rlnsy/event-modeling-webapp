@@ -729,3 +729,48 @@ input[type="checkbox"].form-input {
   font-weight: 600;
 }
 .add-field-btn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+
+.dep-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dep-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dep-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+.dep-selector[hidden] { display: none; }
+.dep-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px;
+  background: var(--bg);
+}
+.dep-option {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--fg);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dep-option:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }

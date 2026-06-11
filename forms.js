@@ -90,8 +90,9 @@
   }
 
   // Turn collected form values into a fully schema-valid object. Required-but-
-  // empty collections (dependencies, spec steps) start empty and are refined by
-  // hand in the editor; `fields` is populated from the inline field editor.
+  // empty collections (spec steps) start empty and are refined by hand in the
+  // editor; `fields` comes from the inline field editor and `dependencies` from
+  // the read-model dependency editor (empty for other element types).
   function build(type, v) {
     if (type === "slice") {
       const o = {
@@ -111,7 +112,7 @@
         title: v.title,
         type: ELEMENT_TYPE[type],
         fields: Array.isArray(v.fields) ? v.fields : [],
-        dependencies: [],
+        dependencies: Array.isArray(v.dependencies) ? v.dependencies : [],
       };
       if (v.description) o.description = v.description;
       if (v.listElement) o.listElement = true;
@@ -241,6 +242,104 @@
       });
   }
 
+  // ---------- Dependency editor (read models) ----------
+
+  // Seed the field editor from `ev`'s fields, reusing addFieldRow. Skips
+  // generated fields and names already present, so it's safe to click twice.
+  function copyEventFields(ev, fieldEditor) {
+    if (!fieldEditor) return;
+    const present = new Set(fieldEditor.rows.map((r) => r.read().name).filter(Boolean));
+    for (const f of (ev && Array.isArray(ev.fields) ? ev.fields : [])) {
+      if (!f || !f.name || f.generated || present.has(f.name)) continue;
+      fieldEditor.addRow(f);
+      present.add(f.name);
+    }
+  }
+
+  // Build the "Dependencies" section for a read model: an "Add dependency"
+  // button reveals a scrollable list of every event in the model. Selecting one
+  // adds a row contributing { id, type: "INBOUND", title, elementType: "EVENT" }
+  // and exposing a per-row "Copy fields" button that seeds the field editor from
+  // that specific event. Returns { section, read } where read() yields the
+  // Dependency objects in row order.
+  function buildDependencySection(events, fieldEditor) {
+    const depRows = [];
+
+    const section = document.createElement("div");
+    section.className = "form-row field-section";
+    const lbl = document.createElement("span");
+    lbl.className = "form-label";
+    lbl.textContent = "Dependencies";
+    section.appendChild(lbl);
+
+    const rowsEl = document.createElement("div");
+    rowsEl.className = "dep-rows";
+    section.appendChild(rowsEl);
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "add-field-btn";
+    addBtn.textContent = "+ Add dependency";
+    section.appendChild(addBtn);
+
+    // Hidden until the button is clicked; one button per model-wide event.
+    const selector = document.createElement("div");
+    selector.className = "dep-selector";
+    selector.hidden = true;
+    addBtn.addEventListener("click", () => { selector.hidden = !selector.hidden; });
+
+    function addDepRow(ev) {
+      const row = document.createElement("div");
+      row.className = "dep-row";
+
+      const name = document.createElement("span");
+      name.className = "dep-name";
+      name.textContent = ev.title || ev.id;
+
+      const copyBtn = document.createElement("button");
+      copyBtn.type = "button";
+      copyBtn.className = "add-field-btn";
+      copyBtn.textContent = "Copy fields";
+      copyBtn.addEventListener("click", () => copyEventFields(ev, fieldEditor));
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "field-remove";
+      remove.title = "Remove dependency";
+      remove.textContent = "×";
+
+      row.append(name, copyBtn, remove);
+
+      const entry = {
+        el: row,
+        dep: { id: ev.id, type: "INBOUND", title: ev.title || "", elementType: "EVENT" },
+      };
+      remove.addEventListener("click", () => {
+        const i = depRows.indexOf(entry);
+        if (i >= 0) depRows.splice(i, 1);
+        row.remove();
+      });
+
+      depRows.push(entry);
+      rowsEl.appendChild(row);
+    }
+
+    for (const ev of events) {
+      const opt = document.createElement("button");
+      opt.type = "button";
+      opt.className = "dep-option";
+      opt.textContent = ev.title || ev.id;
+      opt.addEventListener("click", () => {
+        addDepRow(ev);
+        selector.hidden = true;
+      });
+      selector.appendChild(opt);
+    }
+    section.appendChild(selector);
+
+    return { section, read: () => depRows.map((r) => r.dep) };
+  }
+
   // ---------- Modal controller ----------
 
   const backdrop = document.getElementById("formBackdrop");
@@ -265,6 +364,8 @@
   // Render the form for `type` and call onSubmit(builtObject) when accepted.
   // `options.copyFromFields` (an array of Field objects) adds a "copy fields"
   // button to the field editor that seeds rows from those fields.
+  // `options.events` (an array of event objects) drives the read-model
+  // dependency selector, letting the form attach INBOUND event dependencies.
   function open(type, onSubmit, options) {
     const specs = SPECS[type];
     if (!specs) return;
@@ -276,6 +377,10 @@
 
     // key -> () => value, so simple inputs and the field editor read uniformly.
     const readers = {};
+
+    // Captured when the fieldlist spec is rendered, so the dependency editor can
+    // seed the field rows from a chosen event.
+    let fieldEditor = null;
 
     for (const spec of specs) {
       if (spec.kind === "fieldlist") {
@@ -292,6 +397,11 @@
 
         const rows = [];
         const showGenerated = type === "event";
+        fieldEditor = {
+          rows,
+          sectionEl: section,
+          addRow: (f) => addFieldRow(rowsEl, rows, showGenerated, f),
+        };
 
         const actions = document.createElement("div");
         actions.className = "field-actions";
@@ -359,6 +469,19 @@
         row.appendChild(el);
       }
       bodyEl.appendChild(row);
+    }
+
+    // Read models can attach event dependencies drawn from the whole model.
+    // Rendered above the field editor so "Copy fields" reads naturally.
+    const events = Array.isArray(opts.events) ? opts.events : [];
+    if (type === "readmodel" && events.length) {
+      const deps = buildDependencySection(events, fieldEditor);
+      if (fieldEditor && fieldEditor.sectionEl) {
+        bodyEl.insertBefore(deps.section, fieldEditor.sectionEl);
+      } else {
+        bodyEl.appendChild(deps.section);
+      }
+      readers.dependencies = deps.read;
     }
 
     submitHandler = () => {

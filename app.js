@@ -573,6 +573,19 @@
     return out;
   }
 
+  // Every event across the whole model, in slice/array order. Read models pick
+  // their dependencies from this list, so a read model can depend on events
+  // outside its own slice.
+  function allEvents(model) {
+    const out = [];
+    for (const s of (Array.isArray(model.slices) ? model.slices : [])) {
+      for (const ev of (s && Array.isArray(s.events) ? s.events : [])) {
+        if (ev && ev.id) out.push(ev);
+      }
+    }
+    return out;
+  }
+
   // Open the add-form for `type`, targeting the slice identified by `sliceId`
   // (falling back to `sliceIdx` if the slice has no id). `type === "slice"`
   // appends to the top-level slices array instead.
@@ -584,10 +597,15 @@
     }
 
     // Commands can pull their (non-generated) fields from the slice's event.
+    // Read models can attach model-wide events as INBOUND dependencies and
+    // copy a chosen event's fields.
     let options = null;
     if (type === "command") {
       const fields = eventFieldsOf(findSlice(snapshot, sliceId, sliceIdx));
       if (fields.length) options = { copyFromFields: fields };
+    } else if (type === "readmodel") {
+      const events = allEvents(snapshot);
+      if (events.length) options = { events };
     }
 
     AddForms.open(type, (obj) => {
