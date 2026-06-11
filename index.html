@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>JSON Editor &middot; Event Modeling</title>
   <link rel="stylesheet" href="styles.css" />
+  <!-- Applies the saved theme before paint to avoid a flash of the wrong theme. -->
+  <script src="theme.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -19,6 +21,7 @@
       <span class="schema-badge" title="Validating against the Event Modeling schema">Event Modeling schema</span>
       <button id="formatBtn" type="button" title="Pretty-print (Ctrl/Cmd+S)">Format</button>
       <button id="clearBtn" type="button">Clear</button>
+      <button id="themeToggle" type="button" title="Theme" aria-label="Theme"></button>
     </div>
   </header>
 

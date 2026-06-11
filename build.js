@@ -10,6 +10,7 @@ const OUT_DIR = "public";
 const STATIC_FILES = [
   "index.html",
   "styles.css",
+  "theme.js",
   "schema.js",
   "sessions.js",
   "forms.js",

@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "http-server . -p 8080 -c-1 -o",
     "build": "bun run build.js",
-    "check": "node --check app.js && node --check forms.js && node --check schema.js && node --check sessions.js"
+    "check": "node --check app.js && node --check forms.js && node --check schema.js && node --check sessions.js && node --check theme.js"
   },
   "devDependencies": {
     "http-server": "^14.1.1"

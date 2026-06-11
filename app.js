@@ -11,6 +11,7 @@
   const problemsList = document.getElementById("problemsList");
   const formatBtn = document.getElementById("formatBtn");
   const clearBtn = document.getElementById("clearBtn");
+  const themeToggle = document.getElementById("themeToggle");
   const sessionSelect = document.getElementById("sessionSelect");
   const newSessionBtn = document.getElementById("newSessionBtn");
   const renameSessionBtn = document.getElementById("renameSessionBtn");
@@ -945,6 +946,23 @@
     } catch (_) {
       validate(); // surface the parse error; nothing to format
     }
+  }
+
+  // Theme toggle cycles light -> dark -> system; the label reflects the choice.
+  // Theme.onChange fires immediately so the button is labelled correctly on load.
+  const THEME_LABELS = {
+    light: "☀️ Light",
+    dark: "🌙 Dark",
+    system: "🖥️ System",
+  };
+  if (window.Theme) {
+    Theme.onChange((mode) => {
+      const label = THEME_LABELS[mode] || THEME_LABELS.system;
+      themeToggle.textContent = label;
+      themeToggle.title = "Theme: " + label + " · click to cycle";
+      themeToggle.setAttribute("aria-label", "Theme: " + label);
+    });
+    themeToggle.addEventListener("click", () => Theme.cycle());
   }
 
   formatBtn.addEventListener("click", format);

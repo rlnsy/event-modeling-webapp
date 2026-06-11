@@ -1,4 +1,10 @@
 :root {
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo,
+    Consolas, monospace;
+}
+
+/* Catppuccin Mocha. */
+[data-theme="dark"] {
   --bg: #1e1e2e;
   --bg-elev: #181825;
   --panel: #11111b;
@@ -7,14 +13,44 @@
   --fg-faint: #6c7086;
   --line: #313244;
   --accent: #89b4fa;
+  --accent-hover: #a6c8ff;
   --ok: #a6e3a1;
   --warn: #f9e2af;
   --err: #f38ba8;
   --err-bg: rgba(243, 139, 168, 0.14);
   --event: #fab387;
   --automation: #cba6f7;
-  --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo,
-    Consolas, monospace;
+  --teal: #94e2d5;
+  --btn-hover: #45475a;
+  --btn-active: #585b70;
+  --card-hover: #1c1c2a;
+  --shadow: rgba(0, 0, 0, 0.4);
+  --shadow-strong: rgba(0, 0, 0, 0.5);
+}
+
+/* Catppuccin Latte. */
+[data-theme="light"] {
+  --bg: #eff1f5;
+  --bg-elev: #e6e9ef;
+  --panel: #dce0e8;
+  --fg: #4c4f69;
+  --fg-dim: #6c6f85;
+  --fg-faint: #9ca0b0;
+  --line: #ccd0da;
+  --accent: #1e66f5;
+  --accent-hover: #0b56e0;
+  --ok: #40a02b;
+  --warn: #df8e1d;
+  --err: #d20f39;
+  --err-bg: rgba(210, 15, 57, 0.1);
+  --event: #fe640b;
+  --automation: #8839ef;
+  --teal: #179299;
+  --btn-hover: #bcc0cc;
+  --btn-active: #acb0be;
+  --card-hover: #d2d6e0;
+  --shadow: rgba(0, 0, 0, 0.12);
+  --shadow-strong: rgba(0, 0, 0, 0.18);
 }
 
 * { box-sizing: border-box; }
@@ -64,9 +100,9 @@ body {
   gap: 6px;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(137, 180, 250, 0.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
   color: var(--accent);
-  border: 1px solid rgba(137, 180, 250, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   font-size: 12px;
   font-weight: 600;
   user-select: none;
@@ -89,8 +125,8 @@ button {
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s;
 }
-button:hover { background: #45475a; }
-button:active { background: #585b70; }
+button:hover { background: var(--btn-hover); }
+button:active { background: var(--btn-active); }
 
 /* Session controls: a switcher plus New/Rename/Delete, set off from the
    Format/Clear actions by a thin divider. */
@@ -113,7 +149,7 @@ button:active { background: #585b70; }
   cursor: pointer;
   max-width: 220px;
 }
-#sessionSelect:hover { background: #45475a; }
+#sessionSelect:hover { background: var(--btn-hover); }
 
 /* ---------- Editor ---------- */
 .editor-wrap {
@@ -259,7 +295,7 @@ button:active { background: #585b70; }
   cursor: pointer;
   transition: background 0.1s, border-color 0.1s;
 }
-.card:hover { background: #1c1c2a; }
+.card:hover { background: var(--card-hover); }
 .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .card .card-title {
   font-size: 12.5px;
@@ -287,7 +323,7 @@ button:active { background: #585b70; }
 .card .card-fields .f-ex { color: var(--ok); }
 .card .card-fields .f-flag {
   color: var(--warn);
-  background: rgba(249, 226, 175, 0.12);
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
   border-radius: 3px;
   padding: 0 4px;
   font-size: 9.5px;
@@ -315,7 +351,7 @@ button:active { background: #585b70; }
 /* Per-type accent colors on the left border. */
 .card.type-actor        { border-left-color: var(--fg-faint); }
 .card.type-screen       { border-left-color: var(--fg-dim); }
-.card.type-screenimage  { border-left-color: #94e2d5; }
+.card.type-screenimage  { border-left-color: var(--teal); }
 .card.type-command      { border-left-color: var(--accent); }
 .card.type-readmodel    { border-left-color: var(--ok); }
 .card.type-automation   { border-left-color: var(--automation); }
@@ -428,7 +464,7 @@ button:active { background: #585b70; }
   background: var(--bg-elev);
   border: 1px solid var(--line);
   border-radius: 8px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 40px var(--shadow-strong);
   overflow: hidden;
 }
 .modal-head {
@@ -498,9 +534,9 @@ button:active { background: #585b70; }
 
 /* Shared look for the "+ Add Slice" button and the per-slice "+ Add" summary. */
 .add-btn {
-  background: rgba(137, 180, 250, 0.12);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent);
-  border: 1px solid rgba(137, 180, 250, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   border-radius: 6px;
   padding: 4px 9px;
   font-size: 12px;
@@ -508,7 +544,7 @@ button:active { background: #585b70; }
   cursor: pointer;
   list-style: none;
 }
-.add-btn:hover { background: rgba(137, 180, 250, 0.2); }
+.add-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 summary.add-btn { user-select: none; }
 summary.add-btn::-webkit-details-marker { display: none; }
 summary.add-btn::marker { content: ""; }
@@ -532,16 +568,16 @@ summary.add-btn::marker { content: ""; }
 /* ◀ / ▶ slice reorder buttons. */
 .slice-reorder { display: flex; gap: 4px; }
 .reorder-btn {
-  background: rgba(137, 180, 250, 0.12);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent);
-  border: 1px solid rgba(137, 180, 250, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   border-radius: 6px;
   padding: 4px 7px;
   font-size: 11px;
   line-height: 1;
   cursor: pointer;
 }
-.reorder-btn:hover:not(:disabled) { background: rgba(137, 180, 250, 0.2); }
+.reorder-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 .reorder-btn:disabled { opacity: 0.35; cursor: default; }
 
 .add-menu { position: relative; flex: 0 0 auto; }
@@ -557,7 +593,7 @@ summary.add-btn::marker { content: ""; }
   background: var(--bg-elev);
   border: 1px solid var(--line);
   border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 24px var(--shadow);
 }
 .add-menu-item {
   background: transparent;
@@ -628,7 +664,7 @@ input[type="checkbox"].form-input {
   font-weight: 600;
   border: 0;
 }
-.btn-primary:hover { background: #a6c8ff; }
+.btn-primary:hover { background: var(--accent-hover); }
 .btn-secondary { background: var(--line); }
 
 /* Roomier modal for the element forms that carry the field editor. */
@@ -684,12 +720,12 @@ input[type="checkbox"].form-input {
 }
 .add-field-btn {
   align-self: flex-start;
-  background: rgba(137, 180, 250, 0.1);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent);
-  border: 1px dashed rgba(137, 180, 250, 0.4);
+  border: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent);
   border-radius: 6px;
   padding: 5px 10px;
   font-size: 12px;
   font-weight: 600;
 }
-.add-field-btn:hover { background: rgba(137, 180, 250, 0.18); }
+.add-field-btn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
