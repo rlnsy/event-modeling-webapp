@@ -55,8 +55,24 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="formBackdrop" hidden>
+    <form class="modal" id="addForm" role="dialog" aria-modal="true" aria-labelledby="formTitle">
+      <header class="modal-head">
+        <span class="modal-title" id="formTitle"></span>
+        <button class="modal-close" id="formClose" type="button" aria-label="Close">&times;</button>
+      </header>
+      <div class="modal-body form-body" id="formBody"></div>
+      <footer class="modal-foot">
+        <span class="form-error" id="formError"></span>
+        <button type="button" id="formCancel" class="btn-secondary">Cancel</button>
+        <button type="submit" class="btn-primary">Add</button>
+      </footer>
+    </form>
+  </div>
+
   <script src="schema.js"></script>
   <script src="sessions.js"></script>
+  <script src="forms.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -454,13 +454,131 @@
     if (e.key === "Escape" && !modalBackdrop.hidden) closeDetail();
   });
 
+  // ---------- Adding components ----------
+  // The textarea is the source of truth: every add parses it, splices the new
+  // object into the parsed model, and re-serializes the whole document. The
+  // existing validate() cycle then refreshes the preview, gutter, and status.
+
+  // Where each addable type lands inside its slice.
+  const TARGET_KEY = {
+    command: "commands",
+    event: "events",
+    readmodel: "readmodels",
+    screen: "screens",
+    processor: "processors",
+    actor: "actors",
+    screenImage: "screenImages",
+    table: "tables",
+    specification: "specifications",
+  };
+
+  // Parse the editor text into a model object suitable for editing, or null if
+  // it can't be (syntax error, or a non-object root). An empty document is
+  // treated as a fresh, sliceless model so the first slice can be added.
+  function modelForEditing() {
+    if (input.value.trim() === "") return { slices: [] };
+    let parsed;
+    try {
+      parsed = JSON.parse(input.value);
+    } catch (_) {
+      return null;
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return parsed;
+  }
+
+  // Serialize a mutated model back into the editor and run the normal cycle.
+  function commitModel(model) {
+    input.value = JSON.stringify(model, null, 2);
+    saveActive();
+    validate();
+  }
+
+  // Open the add-form for `type`, targeting the slice identified by `sliceId`
+  // (falling back to `sliceIdx` if the slice has no id). `type === "slice"`
+  // appends to the top-level slices array instead.
+  function startAdd(type, sliceId, sliceIdx) {
+    if (modelForEditing() == null) {
+      setStatus("err", "Resolve JSON errors before adding", "");
+      return;
+    }
+    AddForms.open(type, (obj) => {
+      const model = modelForEditing();
+      if (model == null) {
+        setStatus("err", "Resolve JSON errors before adding", "");
+        return;
+      }
+      if (type === "slice") {
+        if (!Array.isArray(model.slices)) model.slices = [];
+        model.slices.push(obj);
+      } else {
+        const slices = Array.isArray(model.slices) ? model.slices : [];
+        const slice =
+          slices.find((s) => s && sliceId != null && s.id === sliceId) ||
+          slices[sliceIdx];
+        if (!slice) {
+          setStatus("err", "Could not find the target slice", "");
+          return;
+        }
+        const key = TARGET_KEY[type];
+        if (!Array.isArray(slice[key])) slice[key] = [];
+        slice[key].push(obj);
+      }
+      commitModel(model);
+    });
+  }
+
+  // A per-slice "+ Add" disclosure menu listing every addable element type.
+  // Uses a native <details> so no global open/close state is needed.
+  const SLICE_ADD_ITEMS = [
+    ["command", "Command"], ["event", "Event"], ["readmodel", "Read Model"],
+    ["screen", "Screen"], ["processor", "Processor"], ["actor", "Actor"],
+    ["screenImage", "Screen Image"], ["table", "Table"], ["specification", "Specification"],
+  ];
+
+  function sliceAddMenu(sliceId, sliceIdx) {
+    const det = document.createElement("details");
+    det.className = "add-menu";
+    const summary = document.createElement("summary");
+    summary.className = "add-btn";
+    summary.textContent = "+ Add";
+    det.appendChild(summary);
+    const list = document.createElement("div");
+    list.className = "add-menu-list";
+    for (const [type, label] of SLICE_ADD_ITEMS) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "add-menu-item";
+      item.textContent = label;
+      item.addEventListener("click", () => {
+        det.open = false;
+        startAdd(type, sliceId, sliceIdx);
+      });
+      list.appendChild(item);
+    }
+    det.appendChild(list);
+    return det;
+  }
+
   function renderModel(parsed) {
     preview.innerHTML = "";
+
+    // Always offer a global "Add Slice" so an empty document can be bootstrapped.
+    const toolbar = document.createElement("div");
+    toolbar.className = "preview-toolbar";
+    const addSliceBtn = document.createElement("button");
+    addSliceBtn.type = "button";
+    addSliceBtn.className = "add-btn";
+    addSliceBtn.textContent = "+ Add Slice";
+    addSliceBtn.addEventListener("click", () => startAdd("slice", null, null));
+    toolbar.appendChild(addSliceBtn);
+    preview.appendChild(toolbar);
+
     const slices = parsed && Array.isArray(parsed.slices) ? parsed.slices : null;
     if (!slices || slices.length === 0) {
       const empty = document.createElement("div");
       empty.className = "preview-empty";
-      empty.textContent = slices ? "No slices to display." : "Nothing to preview.";
+      empty.textContent = slices ? "No slices yet — add one to begin." : "Nothing to preview.";
       preview.appendChild(empty);
       return;
     }
@@ -477,21 +595,25 @@
     const row = document.createElement("div");
     row.className = "preview-row";
 
-    for (const { s } of ordered) {
+    for (const { s, i } of ordered) {
       const slice = s || {};
       const col = document.createElement("div");
       col.className = "slice-column";
 
       const header = document.createElement("div");
       header.className = "slice-header";
+      const headMain = document.createElement("div");
+      headMain.className = "slice-head-main";
       const title = document.createElement("div");
       title.className = "slice-title";
       title.textContent = slice.title != null && slice.title !== "" ? String(slice.title) : "(untitled slice)";
-      header.appendChild(title);
+      headMain.appendChild(title);
       const meta = document.createElement("div");
       meta.className = "slice-meta";
       meta.textContent = [slice.sliceType, slice.status].filter(Boolean).join(" · ");
-      if (meta.textContent) header.appendChild(meta);
+      if (meta.textContent) headMain.appendChild(meta);
+      header.appendChild(headMain);
+      header.appendChild(sliceAddMenu(slice.id, i));
       col.appendChild(header);
 
       for (const laneDef of LANES) {
