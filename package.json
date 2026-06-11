@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "http-server . -p 8080 -c-1 -o",
+    "build": "bun run build.js",
     "check": "node --check app.js && node --check forms.js && node --check schema.js && node --check sessions.js"
   },
   "devDependencies": {
