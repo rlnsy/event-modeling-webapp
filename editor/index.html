@@ -10,6 +10,12 @@
   <header class="topbar">
     <h1>JSON Editor</h1>
     <div class="actions">
+      <div class="session-group">
+        <select id="sessionSelect" title="Switch session" aria-label="Active session"></select>
+        <button id="newSessionBtn" type="button" title="New session">New</button>
+        <button id="renameSessionBtn" type="button" title="Rename session">Rename</button>
+        <button id="deleteSessionBtn" type="button" title="Delete session">Delete</button>
+      </div>
       <span class="schema-badge" title="Validating against the Event Modeling schema">Event Modeling schema</span>
       <button id="formatBtn" type="button" title="Pretty-print (Ctrl/Cmd+S)">Format</button>
       <button id="clearBtn" type="button">Clear</button>
@@ -50,6 +56,7 @@
   </div>
 
   <script src="schema.js"></script>
+  <script src="sessions.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -92,6 +92,29 @@ button {
 button:hover { background: #45475a; }
 button:active { background: #585b70; }
 
+/* Session controls: a switcher plus New/Rename/Delete, set off from the
+   Format/Clear actions by a thin divider. */
+.session-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 12px;
+  border-right: 1px solid var(--line);
+}
+
+#sessionSelect {
+  background: var(--line);
+  color: var(--fg);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  max-width: 220px;
+}
+#sessionSelect:hover { background: #45475a; }
+
 /* ---------- Editor ---------- */
 .editor-wrap {
   flex: 1 1 auto;

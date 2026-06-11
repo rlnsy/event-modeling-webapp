@@ -11,6 +11,10 @@
   const problemsList = document.getElementById("problemsList");
   const formatBtn = document.getElementById("formatBtn");
   const clearBtn = document.getElementById("clearBtn");
+  const sessionSelect = document.getElementById("sessionSelect");
+  const newSessionBtn = document.getElementById("newSessionBtn");
+  const renameSessionBtn = document.getElementById("renameSessionBtn");
+  const deleteSessionBtn = document.getElementById("deleteSessionBtn");
   const preview = document.getElementById("preview");
   const modalBackdrop = document.getElementById("modalBackdrop");
   const modalTitle = document.getElementById("modalTitle");
@@ -634,12 +638,76 @@
     gutter.scrollTop = input.scrollTop;
   }
 
+  // ---------- Sessions ----------
+  // The active session's content is autosaved on every (debounced) edit. The
+  // select, New/Rename/Delete buttons switch and manage named documents stored
+  // by sessions.js.
+
+  let activeId = null;
+
+  // Rebuild the <select> from the stored sessions, keeping the active one shown.
+  function refreshSessionSelect() {
+    sessionSelect.innerHTML = "";
+    for (const s of Sessions.list()) {
+      const opt = document.createElement("option");
+      opt.value = s.id;
+      opt.textContent = s.name;
+      if (s.id === activeId) opt.selected = true;
+      sessionSelect.appendChild(opt);
+    }
+  }
+
+  // Open a session: make it active, load its text, validate, refresh the select.
+  function loadSession(id) {
+    const s = Sessions.get(id);
+    if (!s) return;
+    activeId = s.id;
+    Sessions.setActiveId(s.id);
+    input.value = s.content;
+    refreshSessionSelect();
+    validate();
+  }
+
+  // Persist the current editor text into the active session.
+  function saveActive() {
+    if (activeId) Sessions.update(activeId, input.value);
+  }
+
+  sessionSelect.addEventListener("change", () => loadSession(sessionSelect.value));
+
+  newSessionBtn.addEventListener("click", () => {
+    const name = window.prompt("Name for the new session:", "Untitled");
+    if (name === null) return; // cancelled
+    const s = Sessions.create(name, '{\n  "slices": []\n}');
+    loadSession(s.id);
+    input.focus();
+  });
+
+  renameSessionBtn.addEventListener("click", () => {
+    const current = Sessions.get(activeId);
+    if (!current) return;
+    const name = window.prompt("Rename session:", current.name);
+    if (name === null || name.trim() === "") return;
+    Sessions.rename(activeId, name);
+    refreshSessionSelect();
+  });
+
+  deleteSessionBtn.addEventListener("click", () => {
+    const current = Sessions.get(activeId);
+    if (!current) return;
+    if (!window.confirm(`Delete session "${current.name}"? This cannot be undone.`)) return;
+    Sessions.remove(activeId);
+    // Always keep at least one session open.
+    const next = Sessions.ensureDefault();
+    loadSession(next.id);
+  });
+
   // ---------- Wiring ----------
 
   let debounce;
   function scheduleValidate() {
     clearTimeout(debounce);
-    debounce = setTimeout(validate, 150);
+    debounce = setTimeout(() => { saveActive(); validate(); }, 150);
   }
 
   input.addEventListener("input", () => {
@@ -678,10 +746,15 @@
   clearBtn.addEventListener("click", () => {
     input.value = "";
     input.focus();
+    saveActive();
     validate();
   });
-  // Seed with a tiny valid example so the screen isn't bare.
-  input.value = '{\n  "slices": []\n}';
+
+  // Open the active session (creating a seeded default on first run).
+  const active = Sessions.ensureDefault();
+  activeId = active.id;
+  input.value = active.content;
+  refreshSessionSelect();
   validate();
   input.focus();
 })();
