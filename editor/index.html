@@ -26,6 +26,7 @@
           placeholder="Paste or write JSON here&hellip;"></textarea>
       </div>
     </div>
+    <aside class="preview" id="preview" aria-label="Model preview"></aside>
   </main>
 
   <footer class="statusbar" id="statusbar">
@@ -37,6 +38,16 @@
   <section class="problems" id="problems" hidden>
     <ul id="problemsList"></ul>
   </section>
+
+  <div class="modal-backdrop" id="modalBackdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <header class="modal-head">
+        <span class="modal-title" id="modalTitle"></span>
+        <button class="modal-close" id="modalClose" type="button" aria-label="Close">&times;</button>
+      </header>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
 
   <script src="schema.js"></script>
   <script src="app.js"></script>

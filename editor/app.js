@@ -11,6 +11,11 @@
   const problemsList = document.getElementById("problemsList");
   const formatBtn = document.getElementById("formatBtn");
   const clearBtn = document.getElementById("clearBtn");
+  const preview = document.getElementById("preview");
+  const modalBackdrop = document.getElementById("modalBackdrop");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalBody = document.getElementById("modalBody");
+  const modalClose = document.getElementById("modalClose");
 
   // ---------- Helpers ----------
 
@@ -190,6 +195,335 @@
     highlight.innerHTML = html;
   }
 
+  // ---------- Model preview ----------
+  // Lanes top-to-bottom within a slice column. Each lane pulls from one or more
+  // slice arrays; cards are tagged by `type` for color coding.
+  const LANES = [
+    { type: "actor", keys: ["actors"] },
+    { type: "screen" }, // screens (with embedded screenImages) + processors; handled specially
+    { type: "command", keys: ["readmodels", "commands"], typeFor: { readmodels: "readmodel", commands: "command" } },
+    { type: "event", keys: ["events"] },
+    { type: "specification", keys: ["specifications"] },
+    { type: "table", keys: ["tables"] },
+  ];
+
+  function asArray(v) {
+    return Array.isArray(v) ? v : [];
+  }
+
+  const TYPE_LABELS = {
+    actor: "Actor", screen: "Screen", screenimage: "Screen Image", command: "Command",
+    readmodel: "Read Model", automation: "Automation", event: "Event",
+    specification: "Specification", table: "Table",
+  };
+
+  // Compact, human-readable form of a field's `example` value.
+  function exampleText(ex) {
+    if (ex == null) return null;
+    if (typeof ex === "string") return JSON.stringify(ex);
+    const s = JSON.stringify(ex);
+    return s.length > 32 ? s.slice(0, 31) + "…" : s;
+  }
+
+  // One field line: name, type, flag badges, and example value when present.
+  function fieldLine(f) {
+    const li = document.createElement("li");
+    if (!f || typeof f !== "object") {
+      li.textContent = "?";
+      return li;
+    }
+    const name = document.createElement("span");
+    name.className = "f-name";
+    name.textContent = f.name != null ? String(f.name) : "?";
+    li.appendChild(name);
+
+    if (f.type != null) {
+      const ty = document.createElement("span");
+      ty.className = "f-type";
+      ty.textContent = String(f.type);
+      li.appendChild(ty);
+    }
+
+    const flags = [];
+    if (f.idAttribute) flags.push("id");
+    if (f.optional) flags.push("opt");
+    if (f.generated) flags.push("gen");
+    if (f.technicalAttribute) flags.push("tech");
+    if (f.cardinality === "List") flags.push("list");
+    for (const fl of flags) {
+      const b = document.createElement("span");
+      b.className = "f-flag";
+      b.textContent = fl;
+      li.appendChild(b);
+    }
+
+    const ex = exampleText(f.example);
+    if (ex != null) {
+      const e = document.createElement("span");
+      e.className = "f-ex";
+      e.textContent = "= " + ex;
+      li.appendChild(e);
+    }
+    return li;
+  }
+
+  function fieldList(fields) {
+    const ul = document.createElement("ul");
+    ul.className = "card-fields";
+    for (const f of asArray(fields)) ul.appendChild(fieldLine(f));
+    return ul;
+  }
+
+  // Wrap a fully-built card so clicking (or Enter/Space) opens the detail modal.
+  function makeCard(type, title, body, item, isAuth) {
+    const card = document.createElement("div");
+    card.className = "card type-" + type + (isAuth ? " auth" : "");
+    card.tabIndex = 0;
+    card.setAttribute("role", "button");
+    const t = document.createElement("div");
+    t.className = "card-title";
+    t.textContent = title != null && title !== "" ? String(title) : "(untitled)";
+    card.appendChild(t);
+    if (body) card.appendChild(body);
+    const open = () => openDetail(type, item);
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
+    });
+    return card;
+  }
+
+  // A specification card: each given/when/then step with its fields inline.
+  function specBody(spec) {
+    const wrap = document.createDocumentFragment();
+    for (const [label, key] of [["Given", "given"], ["When", "when"], ["Then", "then"]]) {
+      const steps = asArray(spec[key]);
+      if (steps.length === 0) continue;
+      const group = document.createElement("div");
+      group.className = "spec-group";
+      const lbl = document.createElement("div");
+      lbl.className = "spec-label";
+      lbl.textContent = label;
+      group.appendChild(lbl);
+      for (const step of steps) {
+        const st = document.createElement("div");
+        st.className = "spec-step";
+        st.textContent = step && step.title != null ? String(step.title) : "?";
+        group.appendChild(st);
+        const fields = asArray(step && step.fields);
+        if (fields.length) group.appendChild(fieldList(fields));
+      }
+      wrap.appendChild(group);
+    }
+    return wrap;
+  }
+
+  // A screen-image card: a thumbnail of the `url`, degrading to a note if the
+  // image is missing or fails to load.
+  function screenImageBody(item) {
+    if (!item || !item.url) {
+      const note = document.createElement("div");
+      note.className = "img-missing";
+      note.textContent = "(no image url)";
+      return note;
+    }
+    const img = document.createElement("img");
+    img.className = "screen-img";
+    img.src = String(item.url);
+    img.alt = item.title != null ? String(item.title) : "screen image";
+    img.loading = "lazy";
+    img.addEventListener("error", () => {
+      const note = document.createElement("div");
+      note.className = "img-missing";
+      note.textContent = "(image unavailable)";
+      img.replaceWith(note);
+    });
+    return img;
+  }
+
+  function cardFor(type, item) {
+    if (type === "actor") {
+      return makeCard("actor", item && item.name, null, item, !!(item && item.authRequired));
+    }
+    if (type === "screenimage") {
+      return makeCard("screenimage", item && item.title, item ? screenImageBody(item) : null, item);
+    }
+    if (type === "specification") {
+      return makeCard("specification", item && item.title, item ? specBody(item) : null, item);
+    }
+    return makeCard(type, item && item.title, item ? fieldList(item.fields) : null, item);
+  }
+
+  // An image embedded inside a screen card. Clicking it opens the image's own
+  // detail (it's slice-level data, not part of the screen element), so we stop
+  // the click from bubbling up to the screen card's handler.
+  function embeddedImage(im) {
+    const wrap = document.createElement("div");
+    wrap.className = "screen-img-wrap";
+    wrap.tabIndex = 0;
+    wrap.setAttribute("role", "button");
+    wrap.appendChild(screenImageBody(im));
+    const open = (e) => { e.stopPropagation(); openDetail("screenimage", im); };
+    wrap.addEventListener("click", open);
+    wrap.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(e); }
+    });
+    return wrap;
+  }
+
+  // A screen card: title, fields, then any slice screen images beneath them.
+  function screenCard(screen, images) {
+    const body = document.createDocumentFragment();
+    body.appendChild(fieldList(asArray(screen && screen.fields)));
+    for (const im of asArray(images)) body.appendChild(embeddedImage(im));
+    return makeCard("screen", screen && screen.title, body, screen);
+  }
+
+  // ---------- Detail modal ----------
+  // Recursively render any JSON value as a readable tree so the modal shows
+  // *every* property of an element, with nothing hand-picked or dropped.
+  function renderValue(value) {
+    if (value === null || value === undefined) {
+      const s = document.createElement("span");
+      s.className = "detail-scalar detail-muted";
+      s.textContent = "null";
+      return s;
+    }
+    const t = typeof value;
+    if (t === "string" || t === "number" || t === "boolean") {
+      const s = document.createElement("span");
+      s.className = "detail-scalar";
+      s.textContent = t === "string" ? value : String(value);
+      return s;
+    }
+    if (Array.isArray(value)) {
+      if (value.length === 0) {
+        const s = document.createElement("span");
+        s.className = "detail-scalar detail-muted";
+        s.textContent = "(empty)";
+        return s;
+      }
+      const ul = document.createElement("ul");
+      ul.className = "detail-array";
+      for (const item of value) {
+        const li = document.createElement("li");
+        li.appendChild(renderValue(item));
+        ul.appendChild(li);
+      }
+      return ul;
+    }
+    const obj = document.createElement("div");
+    obj.className = "detail-object";
+    for (const key of Object.keys(value)) {
+      const row = document.createElement("div");
+      row.className = "detail-row";
+      const k = document.createElement("span");
+      k.className = "detail-key";
+      k.textContent = key;
+      row.appendChild(k);
+      const v = renderValue(value[key]);
+      v.classList.add("detail-val");
+      row.appendChild(v);
+      obj.appendChild(row);
+    }
+    return obj;
+  }
+
+  function openDetail(type, item) {
+    const name = item && (item.title || item.name || item.id);
+    modalTitle.textContent = (name ? String(name) : "(untitled)") +
+      "  ·  " + (TYPE_LABELS[type] || type);
+    modalBody.innerHTML = "";
+    modalBody.appendChild(renderValue(item == null ? {} : item));
+    modalBackdrop.hidden = false;
+  }
+
+  function closeDetail() {
+    modalBackdrop.hidden = true;
+  }
+
+  modalClose.addEventListener("click", closeDetail);
+  modalBackdrop.addEventListener("click", (e) => {
+    if (e.target === modalBackdrop) closeDetail();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !modalBackdrop.hidden) closeDetail();
+  });
+
+  function renderModel(parsed) {
+    preview.innerHTML = "";
+    const slices = parsed && Array.isArray(parsed.slices) ? parsed.slices : null;
+    if (!slices || slices.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "preview-empty";
+      empty.textContent = slices ? "No slices to display." : "Nothing to preview.";
+      preview.appendChild(empty);
+      return;
+    }
+
+    // Render in `index` order when present, else input order.
+    const ordered = slices
+      .map((s, i) => ({ s, i }))
+      .sort((a, b) => {
+        const ai = Number.isInteger(a.s && a.s.index) ? a.s.index : a.i;
+        const bi = Number.isInteger(b.s && b.s.index) ? b.s.index : b.i;
+        return ai - bi;
+      });
+
+    const row = document.createElement("div");
+    row.className = "preview-row";
+
+    for (const { s } of ordered) {
+      const slice = s || {};
+      const col = document.createElement("div");
+      col.className = "slice-column";
+
+      const header = document.createElement("div");
+      header.className = "slice-header";
+      const title = document.createElement("div");
+      title.className = "slice-title";
+      title.textContent = slice.title != null && slice.title !== "" ? String(slice.title) : "(untitled slice)";
+      header.appendChild(title);
+      const meta = document.createElement("div");
+      meta.className = "slice-meta";
+      meta.textContent = [slice.sliceType, slice.status].filter(Boolean).join(" · ");
+      if (meta.textContent) header.appendChild(meta);
+      col.appendChild(header);
+
+      for (const laneDef of LANES) {
+        const lane = document.createElement("div");
+        lane.className = "lane";
+        let count = 0;
+
+        if (laneDef.type === "screen") {
+          // Screens render their slice's screenImages embedded under the fields.
+          const screens = asArray(slice.screens);
+          const images = asArray(slice.screenImages);
+          for (const sc of screens) { lane.appendChild(screenCard(sc, images)); count++; }
+          // No screen to host them: show images on their own so they aren't lost.
+          if (screens.length === 0) {
+            for (const im of images) { lane.appendChild(cardFor("screenimage", im)); count++; }
+          }
+          for (const pr of asArray(slice.processors)) { lane.appendChild(cardFor("automation", pr)); count++; }
+        } else {
+          for (const key of laneDef.keys) {
+            const type = (laneDef.typeFor && laneDef.typeFor[key]) || laneDef.type;
+            for (const item of asArray(slice[key])) {
+              lane.appendChild(cardFor(type, item));
+              count++;
+            }
+          }
+        }
+
+        if (count > 0) col.appendChild(lane);
+      }
+
+      row.appendChild(col);
+    }
+
+    preview.appendChild(row);
+  }
+
   function setStatus(state, text, meta) {
     statusbar.className = "statusbar" + (state ? " " + state : "");
     statusText.textContent = text;
@@ -243,6 +577,7 @@
       renderGutter(text, errorLines);
       renderHighlight(text, errorLines);
       showProblems([]);
+      renderModel(null);
       return;
     }
 
@@ -265,6 +600,13 @@
       setStatus("err", "Invalid JSON", `Ln ${line}, Col ${col}`);
       showProblems([{ line, col, offset, msg: clean }]);
       return;
+    }
+
+    // Parsed OK — refresh the preview best-effort, even if the schema is off.
+    try {
+      renderModel(parsed);
+    } catch (_) {
+      /* never let a render glitch break validation */
     }
 
     // Valid JSON. Always validate against the Event Modeling schema.

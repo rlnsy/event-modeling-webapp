@@ -25,6 +25,13 @@
           ]
         }
       ],
+      "screenImages": [
+        {
+          "id": "img-open-account",
+          "title": "Open Account",
+          "url": "https://placehold.co/280x180/313244/cdd6f4.png?text=Open+Account"
+        }
+      ],
       "commands": [
         {
           "id": "cmd-open-account",
