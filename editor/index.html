@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JSON Editor &middot; Event Modeling</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>JSON Editor</h1>
+    <div class="actions">
+      <span class="schema-badge" title="Validating against the Event Modeling schema">Event Modeling schema</span>
+      <button id="formatBtn" type="button" title="Pretty-print (Ctrl/Cmd+S)">Format</button>
+      <button id="clearBtn" type="button">Clear</button>
+    </div>
+  </header>
+
+  <main class="editor-wrap">
+    <div class="editor" id="editor">
+      <div class="gutter" id="gutter" aria-hidden="true"></div>
+      <div class="input-stack">
+        <pre class="highlight" id="highlight" aria-hidden="true"></pre>
+        <textarea id="input" spellcheck="false" autocomplete="off"
+          autocapitalize="off" wrap="off"
+          placeholder="Paste or write JSON here&hellip;"></textarea>
+      </div>
+    </div>
+  </main>
+
+  <footer class="statusbar" id="statusbar">
+    <span class="status-dot" id="statusDot"></span>
+    <span class="status-text" id="statusText">Empty</span>
+    <span class="status-meta" id="statusMeta"></span>
+  </footer>
+
+  <section class="problems" id="problems" hidden>
+    <ul id="problemsList"></ul>
+  </section>
+
+  <script src="schema.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

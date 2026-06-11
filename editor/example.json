@@ -1,0 +1,239 @@
+{
+  "slices": [
+    {
+      "id": "slice-open-account",
+      "status": "Done",
+      "index": 0,
+      "title": "Open Account",
+      "context": "accounts",
+      "sliceType": "STATE_CHANGE",
+      "aggregates": ["Account"],
+      "actors": [
+        { "name": "Customer", "authRequired": true }
+      ],
+      "screens": [
+        {
+          "id": "scr-open-account",
+          "title": "Open Account Form",
+          "type": "SCREEN",
+          "fields": [
+            { "name": "ownerName", "type": "String" },
+            { "name": "initialDeposit", "type": "Decimal", "optional": true }
+          ],
+          "dependencies": [
+            { "id": "cmd-open-account", "type": "OUTBOUND", "title": "Open Account", "elementType": "COMMAND" }
+          ]
+        }
+      ],
+      "commands": [
+        {
+          "id": "cmd-open-account",
+          "title": "Open Account",
+          "type": "COMMAND",
+          "aggregate": "Account",
+          "createsAggregate": true,
+          "apiEndpoint": "POST /accounts",
+          "fields": [
+            { "name": "accountId", "type": "UUID", "idAttribute": true, "generated": true },
+            { "name": "ownerName", "type": "String" },
+            { "name": "initialDeposit", "type": "Decimal", "optional": true }
+          ],
+          "dependencies": [
+            { "id": "evt-account-opened", "type": "OUTBOUND", "title": "Account Opened", "elementType": "EVENT" }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "id": "evt-account-opened",
+          "title": "Account Opened",
+          "type": "EVENT",
+          "aggregate": "Account",
+          "context": "INTERNAL",
+          "fields": [
+            { "name": "accountId", "type": "UUID", "idAttribute": true },
+            { "name": "ownerName", "type": "String" },
+            { "name": "openingBalance", "type": "Decimal" },
+            { "name": "openedAt", "type": "DateTime" }
+          ],
+          "dependencies": [
+            { "id": "cmd-open-account", "type": "INBOUND", "title": "Open Account", "elementType": "COMMAND" }
+          ]
+        }
+      ],
+      "readmodels": [],
+      "processors": [],
+      "tables": [],
+      "specifications": [
+        {
+          "id": "spec-open-account",
+          "title": "Opening an account emits AccountOpened",
+          "linkedId": "slice-open-account",
+          "given": [],
+          "when": [
+            {
+              "id": "step-when-open",
+              "title": "Open Account",
+              "type": "SPEC_COMMAND",
+              "fields": [
+                { "name": "ownerName", "type": "String", "example": "Ada Lovelace" },
+                { "name": "initialDeposit", "type": "Decimal", "example": "100.00" }
+              ]
+            }
+          ],
+          "then": [
+            {
+              "id": "step-then-opened",
+              "title": "Account Opened",
+              "type": "SPEC_EVENT",
+              "fields": [
+                { "name": "ownerName", "type": "String", "example": "Ada Lovelace" },
+                { "name": "openingBalance", "type": "Decimal", "example": "100.00" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "slice-account-balance",
+      "status": "InProgress",
+      "index": 1,
+      "title": "View Account Balance",
+      "context": "accounts",
+      "sliceType": "STATE_VIEW",
+      "commands": [],
+      "events": [],
+      "screens": [
+        {
+          "id": "scr-account-balance",
+          "title": "Account Balance",
+          "type": "SCREEN",
+          "fields": [
+            { "name": "ownerName", "type": "String" },
+            { "name": "balance", "type": "Decimal" }
+          ],
+          "dependencies": [
+            { "id": "rm-account-balance", "type": "INBOUND", "title": "Account Balance", "elementType": "READMODEL" }
+          ]
+        }
+      ],
+      "readmodels": [
+        {
+          "id": "rm-account-balance",
+          "title": "Account Balance",
+          "type": "READMODEL",
+          "fields": [
+            { "name": "accountId", "type": "UUID", "idAttribute": true },
+            { "name": "ownerName", "type": "String" },
+            { "name": "balance", "type": "Decimal" }
+          ],
+          "dependencies": [
+            { "id": "evt-account-opened", "type": "INBOUND", "title": "Account Opened", "elementType": "EVENT" }
+          ]
+        }
+      ],
+      "processors": [],
+      "tables": [],
+      "specifications": [
+        {
+          "id": "spec-account-balance",
+          "title": "Balance reflects the opened account",
+          "linkedId": "slice-account-balance",
+          "given": [
+            {
+              "id": "step-given-opened",
+              "title": "Account Opened",
+              "type": "SPEC_EVENT",
+              "fields": [
+                { "name": "ownerName", "type": "String", "example": "Ada Lovelace" },
+                { "name": "openingBalance", "type": "Decimal", "example": "100.00" }
+              ]
+            }
+          ],
+          "when": [],
+          "then": [
+            {
+              "id": "step-then-balance",
+              "title": "Account Balance",
+              "type": "SPEC_READMODEL",
+              "fields": [
+                { "name": "balance", "type": "Decimal", "example": "100.00" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "slice-send-welcome-email",
+      "status": "Created",
+      "index": 2,
+      "title": "Send Welcome Email",
+      "context": "notifications",
+      "sliceType": "AUTOMATION",
+      "commands": [
+        {
+          "id": "cmd-send-welcome-email",
+          "title": "Send Welcome Email",
+          "type": "COMMAND",
+          "service": "notification-service",
+          "fields": [
+            { "name": "accountId", "type": "UUID", "idAttribute": true },
+            { "name": "ownerName", "type": "String" }
+          ],
+          "dependencies": [
+            { "id": "proc-welcome-email", "type": "INBOUND", "title": "Welcome Email Policy", "elementType": "AUTOMATION" }
+          ]
+        }
+      ],
+      "events": [],
+      "readmodels": [],
+      "screens": [],
+      "processors": [
+        {
+          "id": "proc-welcome-email",
+          "title": "Welcome Email Policy",
+          "type": "AUTOMATION",
+          "triggers": ["cmd-send-welcome-email"],
+          "fields": [
+            { "name": "accountId", "type": "UUID", "idAttribute": true }
+          ],
+          "dependencies": [
+            { "id": "evt-account-opened", "type": "INBOUND", "title": "Account Opened", "elementType": "EVENT" },
+            { "id": "cmd-send-welcome-email", "type": "OUTBOUND", "title": "Send Welcome Email", "elementType": "COMMAND" }
+          ]
+        }
+      ],
+      "tables": [],
+      "specifications": [
+        {
+          "id": "spec-welcome-email",
+          "title": "Opening an account triggers a welcome email",
+          "linkedId": "slice-send-welcome-email",
+          "given": [],
+          "when": [
+            {
+              "id": "step-when-opened",
+              "title": "Account Opened",
+              "type": "SPEC_EVENT",
+              "fields": [
+                { "name": "ownerName", "type": "String", "example": "Ada Lovelace" }
+              ]
+            }
+          ],
+          "then": [
+            {
+              "id": "step-then-send",
+              "title": "Send Welcome Email",
+              "type": "SPEC_COMMAND",
+              "fields": [
+                { "name": "ownerName", "type": "String", "example": "Ada Lovelace" }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
