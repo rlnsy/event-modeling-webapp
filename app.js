@@ -283,6 +283,8 @@
   function makeCard(type, title, body, item, isAuth) {
     const card = document.createElement("div");
     card.className = "card type-" + type + (isAuth ? " auth" : "");
+    // Mark traced consumers that have an information-completeness gap.
+    if (item && item.id && completenessFlags.has(item.id)) card.classList.add("has-gap");
     card.tabIndex = 0;
     card.setAttribute("role", "button");
     const t = document.createElement("div");
@@ -766,9 +768,10 @@
     }
     for (const it of items) {
       const li = document.createElement("li");
+      if (it.kind) li.classList.add("problem-" + it.kind);
       const loc = document.createElement("span");
       loc.className = "loc";
-      loc.textContent = it.line ? `Ln ${it.line}, Col ${it.col}` : (it.path || "root");
+      loc.textContent = it.line ? `Ln ${it.line}, Col ${it.col}` : (it.locLabel || it.path || "root");
       const msg = document.createElement("span");
       msg.className = "msg";
       if (it.path) {
@@ -792,6 +795,171 @@
       problemsList.appendChild(li);
     }
     problems.hidden = false;
+  }
+
+  // ---------- Information completeness ----------
+  // Verify that every field on a downstream consumer can be traced back to a
+  // field provided by something upstream that feeds it. All findings are
+  // *warnings*: they surface in the problems panel but never block save/export.
+
+  // Traced consumer element types. Automations/processors are excluded — the
+  // translation pattern models them as inputless automations, so tracing them
+  // would produce false gaps. Events are traced too, but only when something
+  // upstream feeds them (e.g. Command → Event in a state-change slice); an event
+  // with no inbound source is an origin/external event and stays a pure source.
+  const TRACED_TYPES = new Set(["COMMAND", "READMODEL", "SCREEN", "EVENT"]);
+  const CONSUMER_LABEL = { COMMAND: "Command", READMODEL: "Read Model", SCREEN: "Screen", EVENT: "Event" };
+
+  // Element ids with at least one completeness finding, used to mark the
+  // affected cards in the preview. Refreshed on every schema-valid validate().
+  let completenessFlags = new Set();
+
+  // Every element across every slice that can act as a source or a consumer,
+  // flattened as `{ el, sliceType }` so the owning slice's type is available
+  // for tracing decisions (e.g. input vs. display screens).
+  function collectElements(model) {
+    const out = [];
+    const slices = Array.isArray(model && model.slices) ? model.slices : [];
+    for (const s of slices) {
+      if (!s) continue;
+      for (const key of ["commands", "events", "readmodels", "screens", "processors"]) {
+        for (const el of asArray(s[key])) {
+          if (el && el.id) out.push({ el, sliceType: s.sliceType });
+        }
+      }
+    }
+    return out;
+  }
+
+  // Implicit data flow through a slice's lanes, by slice type. Event Modeling
+  // routes data along these lanes even when a model doesn't record an explicit
+  // dependency edge for every hop, so we treat each `[fromKey → toKey]` pair as
+  // an edge from every `fromKey` element to every `toKey` element in the slice.
+  const SLICE_FLOW = {
+    STATE_CHANGE: [["screens", "commands"], ["commands", "events"]],
+    STATE_VIEW:   [["events", "readmodels"], ["readmodels", "screens"]],
+    AUTOMATION:   [["events", "processors"], ["processors", "commands"]],
+  };
+
+  // Build a "who feeds whom" graph from two sources, unioned:
+  //   1. Explicit dependency edges — A feeds B when A has an `OUTBOUND → B`
+  //      dependency OR B has an `INBOUND → A` dependency.
+  //   2. Implicit intra-slice lane flow (SLICE_FLOW above).
+  // Returns both directions: `inbound` maps a consumer id to the Set of elements
+  // that feed it; `outbound` maps a source id to the Set of elements it feeds.
+  function buildFlowGraph(model) {
+    const slices = Array.isArray(model && model.slices) ? model.slices : [];
+    const byId = new Map();
+    for (const s of slices) {
+      if (!s) continue;
+      for (const key of ["commands", "events", "readmodels", "screens", "processors"]) {
+        for (const el of asArray(s[key])) if (el && el.id) byId.set(el.id, el);
+      }
+    }
+
+    const inbound = new Map();
+    const outbound = new Map();
+    const link = (map, key, el) => {
+      if (!el) return;
+      let set = map.get(key);
+      if (!set) { set = new Set(); map.set(key, set); }
+      set.add(el);
+    };
+    // `source` feeds `target`: record it on both directions.
+    const feed = (source, target) => {
+      if (!source || !target || source === target) return;
+      link(inbound, target.id, source);
+      link(outbound, source.id, target);
+    };
+
+    // 1. Explicit dependency edges.
+    for (const el of byId.values()) {
+      for (const dep of asArray(el.dependencies)) {
+        if (!dep || dep.id == null) continue;
+        const other = byId.get(dep.id);
+        if (!other) continue;
+        if (dep.type === "OUTBOUND") feed(el, other);      // el feeds the target
+        else if (dep.type === "INBOUND") feed(other, el);  // the target feeds el
+      }
+    }
+
+    // 2. Implicit intra-slice lane flow.
+    for (const s of slices) {
+      if (!s) continue;
+      const flow = SLICE_FLOW[s.sliceType];
+      if (!flow) continue;
+      for (const [fromKey, toKey] of flow) {
+        for (const a of asArray(s[fromKey])) {
+          for (const b of asArray(s[toKey])) feed(a, b);
+        }
+      }
+    }
+
+    return { inbound, outbound };
+  }
+
+  // True when `el` feeds at least one element of the given element `type`.
+  function feedsType(outbound, el, type) {
+    const targets = outbound.get(el.id);
+    if (!targets) return false;
+    for (const t of targets) if (t && t.type === type) return true;
+    return false;
+  }
+
+  // One finding per unsourced consumer field, plus a lower-severity finding per
+  // field whose name matches an upstream field but whose type drifts. `generated`
+  // fields are system-produced and exempt (mirrors eventFieldsOf's copy behavior).
+  function completenessFindings(model) {
+    const entries = collectElements(model);
+    const { inbound, outbound } = buildFlowGraph(model);
+    const findings = [];
+
+    for (const { el, sliceType } of entries) {
+      if (!TRACED_TYPES.has(el.type)) continue;
+      // An input screen is a *source* of user input, not a consumer: its fields
+      // originate the data, so they need no upstream source. A screen counts as
+      // input when it lives in a STATE_CHANGE slice (Actor → Screen → Command) or
+      // feeds a command directly. Display screens in STATE_VIEW slices (fed by a
+      // read model) stay traced.
+      if (el.type === "SCREEN" && (sliceType === "STATE_CHANGE" || feedsType(outbound, el, "COMMAND"))) continue;
+      const label = CONSUMER_LABEL[el.type] || el.type;
+      const title = el.title != null && el.title !== "" ? String(el.title) : "(untitled)";
+      const srcEls = inbound.has(el.id) ? Array.from(inbound.get(el.id)) : [];
+      // An event with no upstream is an origin/external event — a pure source,
+      // not a consumer — so it has nothing to trace against.
+      if (el.type === "EVENT" && srcEls.length === 0) continue;
+
+      // Available upstream fields: name -> set of types offered by any source.
+      const available = new Map();
+      for (const src of srcEls) {
+        for (const f of asArray(src.fields)) {
+          if (!f || !f.name) continue;
+          let types = available.get(f.name);
+          if (!types) { types = new Set(); available.set(f.name, types); }
+          if (f.type != null) types.add(f.type);
+        }
+      }
+
+      for (const f of asArray(el.fields)) {
+        if (!f || !f.name || f.generated) continue;
+        if (!available.has(f.name)) {
+          findings.push({
+            kind: "warning", locLabel: "completeness", elementId: el.id,
+            msg: `${label} '${title}': field '${f.name}' has no upstream source.`,
+          });
+          continue;
+        }
+        // Sourced — but surface a type drift when no source offers a matching type.
+        const types = available.get(f.name);
+        if (f.type != null && types.size > 0 && !types.has(f.type)) {
+          findings.push({
+            kind: "warning", locLabel: "type", elementId: el.id,
+            msg: `${label} '${title}': field '${f.name}' type ${f.type} differs from upstream type ${Array.from(types).join(" / ")}.`,
+          });
+        }
+      }
+    }
+    return findings;
   }
 
   // ---------- Main validate cycle ----------
@@ -830,28 +998,44 @@
       return;
     }
 
-    // Parsed OK — refresh the preview best-effort, even if the schema is off.
+    // Valid JSON. Always validate against the Event Modeling schema.
+    const schemaErrors = [];
+    validateSchema(parsed, window.EVENT_MODELING_SCHEMA, window.EVENT_MODELING_SCHEMA, "", schemaErrors);
+
+    // Recompute information completeness on every schema-valid edit. The flags
+    // drive the preview marker, so they must be set before renderModel runs.
+    let completenessWarnings = [];
+    completenessFlags = new Set();
+    if (schemaErrors.length === 0) {
+      completenessWarnings = completenessFindings(parsed);
+      for (const w of completenessWarnings) completenessFlags.add(w.elementId);
+    }
+
+    // Refresh the preview best-effort, even if the schema is off.
     try {
       renderModel(parsed);
     } catch (_) {
       /* never let a render glitch break validation */
     }
 
-    // Valid JSON. Always validate against the Event Modeling schema.
-    const schemaErrors = [];
-    validateSchema(parsed, window.EVENT_MODELING_SCHEMA, window.EVENT_MODELING_SCHEMA, "", schemaErrors);
+    renderGutter(text, errorLines);
+    renderHighlight(text, errorLines);
+
     if (schemaErrors.length) {
-      renderGutter(text, errorLines);
-      renderHighlight(text, errorLines);
       setStatus("err", "Schema errors", `${schemaErrors.length} problem${schemaErrors.length > 1 ? "s" : ""}`);
       showProblems(schemaErrors.slice(0, 200).map((e) => ({ path: e.path || "(root)", msg: e.msg })));
       return;
     }
 
-    renderGutter(text, errorLines);
-    renderHighlight(text, errorLines);
-    setStatus("ok", "Valid", "JSON + schema OK");
-    showProblems([]);
+    // Schema-valid: completeness warnings never block — the model is still
+    // "Valid" and saves/exports. They surface in the problems panel only.
+    if (completenessWarnings.length) {
+      const n = completenessWarnings.length;
+      setStatus("ok", "Valid", `${n} completeness warning${n > 1 ? "s" : ""}`);
+    } else {
+      setStatus("ok", "Valid", "JSON + schema OK");
+    }
+    showProblems(completenessWarnings);
   }
 
   // ---------- Scroll sync ----------

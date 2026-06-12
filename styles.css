@@ -359,6 +359,18 @@ button:active { background: var(--btn-active); }
 .card.type-specification{ border-left-color: var(--ok); }
 .card.type-table        { border-left-color: var(--fg-faint); }
 
+/* A traced consumer with an information-completeness gap: a warning ring plus
+   a ⚠ marker on the title so gaps are visible at a glance in the preview. */
+.card.has-gap {
+  border-color: var(--warn);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 45%, transparent);
+}
+.card.has-gap .card-title::after {
+  content: "  \26A0";
+  color: var(--warn);
+  font-size: 11px;
+}
+
 .card .screen-img-wrap { display: block; }
 .card .screen-img-wrap:focus-visible {
   outline: 2px solid var(--accent);
@@ -442,6 +454,12 @@ button:active { background: var(--btn-active); }
 }
 .problems .msg { color: var(--fg-dim); }
 .problems .msg .path { color: var(--warn); }
+
+/* Completeness warnings: never block, so they read as warnings (--warn), not
+   errors (--err) like schema/parse problems. */
+.problems li.problem-warning { border-left-color: var(--warn); }
+.problems li.problem-warning:hover { border-left-color: var(--warn); }
+.problems li.problem-warning .loc { color: var(--warn); }
 
 /* ---------- Detail modal ---------- */
 .modal-backdrop {
