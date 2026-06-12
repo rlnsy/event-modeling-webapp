@@ -558,14 +558,15 @@
     return slices.find((s) => s && sliceId != null && s.id === sliceId) || slices[sliceIdx];
   }
 
-  // Non-generated fields from every event in the slice, deduped by name. These
-  // seed the "copy fields from event" button when adding a command.
-  function eventFieldsOf(slice) {
+  // Non-generated fields from a list of elements, deduped by name. Seeds the
+  // "copy fields" buttons: a command copies its slice's event fields, a state-
+  // change screen copies its command fields, a state-view screen copies its
+  // read-model fields.
+  function fieldsFromElements(list) {
     const out = [];
     const seen = new Set();
-    if (!slice) return out;
-    for (const ev of (Array.isArray(slice.events) ? slice.events : [])) {
-      for (const f of (ev && Array.isArray(ev.fields) ? ev.fields : [])) {
+    for (const el of asArray(list)) {
+      for (const f of asArray(el && el.fields)) {
         if (f && f.name && !f.generated && !seen.has(f.name)) {
           seen.add(f.name);
           out.push(f);
@@ -573,6 +574,11 @@
       }
     }
     return out;
+  }
+
+  // The slice's event fields that seed a command's "copy fields" button.
+  function eventFieldsOf(slice) {
+    return fieldsFromElements(slice && slice.events);
   }
 
   // Every event across the whole model, in slice/array order. Read models pick
@@ -600,7 +606,9 @@
 
     // Commands can pull their (non-generated) fields from the slice's event.
     // Read models can attach model-wide events as INBOUND dependencies and
-    // copy a chosen event's fields.
+    // copy a chosen event's fields. Screens copy from the element that feeds
+    // them: a state-change screen from the slice's command(s), a state-view
+    // screen from the slice's read model(s).
     let options = null;
     if (type === "command") {
       const fields = eventFieldsOf(findSlice(snapshot, sliceId, sliceIdx));
@@ -608,6 +616,20 @@
     } else if (type === "readmodel") {
       const events = allEvents(snapshot);
       if (events.length) options = { events };
+    } else if (type === "screen") {
+      const slice = findSlice(snapshot, sliceId, sliceIdx);
+      if (slice && slice.sliceType === "STATE_VIEW") {
+        const fields = fieldsFromElements(slice.readmodels);
+        if (fields.length) options = { copyFromFields: fields, copyFromLabel: "Copy fields from read model" };
+      } else if (slice && slice.sliceType === "STATE_CHANGE") {
+        const fields = fieldsFromElements(slice.commands);
+        if (fields.length) options = { copyFromFields: fields, copyFromLabel: "Copy fields from command" };
+      }
+    } else if (type === "processor") {
+      // An automation copies from the command it triggers (same slice).
+      const slice = findSlice(snapshot, sliceId, sliceIdx);
+      const fields = fieldsFromElements(slice && slice.commands);
+      if (fields.length) options = { copyFromFields: fields, copyFromLabel: "Copy fields from command" };
     }
 
     AddForms.open(type, (obj) => {
@@ -836,7 +858,7 @@
   // dependency edge for every hop, so we treat each `[fromKey → toKey]` pair as
   // an edge from every `fromKey` element to every `toKey` element in the slice.
   const SLICE_FLOW = {
-    STATE_CHANGE: [["screens", "commands"], ["commands", "events"]],
+    STATE_CHANGE: [["screens", "commands"], ["processors", "commands"], ["commands", "events"]],
     STATE_VIEW:   [["events", "readmodels"], ["readmodels", "screens"]],
     AUTOMATION:   [["events", "processors"], ["processors", "commands"]],
   };

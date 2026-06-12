@@ -363,9 +363,11 @@
 
   // Render the form for `type` and call onSubmit(builtObject) when accepted.
   // `options.copyFromFields` (an array of Field objects) adds a "copy fields"
-  // button to the field editor that seeds rows from those fields.
-  // `options.events` (an array of event objects) drives the read-model
-  // dependency selector, letting the form attach INBOUND event dependencies.
+  // button to the field editor that seeds rows from those fields;
+  // `options.copyFromLabel` overrides that button's label (e.g. "Copy fields
+  // from command"). `options.events` (an array of event objects) drives the
+  // read-model dependency selector, letting the form attach INBOUND event
+  // dependencies.
   function open(type, onSubmit, options) {
     const specs = SPECS[type];
     if (!specs) return;
@@ -419,7 +421,7 @@
           const copyBtn = document.createElement("button");
           copyBtn.type = "button";
           copyBtn.className = "add-field-btn";
-          copyBtn.textContent = "Copy fields from event";
+          copyBtn.textContent = opts.copyFromLabel || "Copy fields from event";
           copyBtn.addEventListener("click", () => {
             const present = new Set(rows.map((r) => r.read().name).filter(Boolean));
             for (const f of copyFields) {
