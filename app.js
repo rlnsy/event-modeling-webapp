@@ -689,6 +689,36 @@
     return det;
   }
 
+  // ---------- Fullscreen (maximized preview) ----------
+  // Transient view state: maximize the preview to fill the working area below the
+  // topbar for presenting/reviewing. Held in memory only — not persisted, and
+  // reset on reload and session switch. The editor (and statusbar) hide while
+  // maximized, so the model is read-only until fullscreen is exited.
+
+  let maximized = false;
+  let maximizeBtn = null; // the button in the most recently rendered toolbar
+
+  // Sync the toolbar button's icon/labels to the current state.
+  function updateMaximizeBtn() {
+    if (!maximizeBtn) return;
+    maximizeBtn.textContent = maximized ? "⤡" : "⤢";
+    const label = maximized ? "Exit fullscreen (Esc)" : "Maximize preview";
+    maximizeBtn.title = label;
+    maximizeBtn.setAttribute("aria-label", label);
+    maximizeBtn.setAttribute("aria-pressed", maximized ? "true" : "false");
+  }
+
+  function setMaximized(on) {
+    maximized = !!on;
+    document.body.classList.toggle("preview-maximized", maximized);
+    updateMaximizeBtn();
+  }
+
+  // Esc exits fullscreen (only acts while maximized).
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && maximized) setMaximized(false);
+  });
+
   function renderModel(parsed) {
     preview.innerHTML = "";
 
@@ -701,6 +731,15 @@
     addSliceBtn.textContent = "+ Add Slice";
     addSliceBtn.addEventListener("click", () => startAdd("slice", null, null));
     toolbar.appendChild(addSliceBtn);
+
+    // Maximize toggle, always available regardless of validation state.
+    maximizeBtn = document.createElement("button");
+    maximizeBtn.type = "button";
+    maximizeBtn.className = "preview-max-btn";
+    maximizeBtn.addEventListener("click", () => setMaximized(!maximized));
+    updateMaximizeBtn();
+    toolbar.appendChild(maximizeBtn);
+
     preview.appendChild(toolbar);
 
     const slices = parsed && Array.isArray(parsed.slices) ? parsed.slices : null;
@@ -1158,6 +1197,7 @@
     activeId = s.id;
     Sessions.setActiveId(s.id);
     input.value = s.content;
+    setMaximized(false); // fullscreen is transient — reset on session switch
     refreshSessionSelect();
     validate();
   }

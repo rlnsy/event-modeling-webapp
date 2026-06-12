@@ -552,8 +552,33 @@ button:disabled:hover {
 /* ---------- Add controls ---------- */
 .preview-toolbar {
   display: flex;
+  align-items: center;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+/* Maximize/restore toggle, pushed to the far right of the toolbar. */
+.preview-max-btn {
+  margin-left: auto;
+  flex: 0 0 auto;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.preview-max-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+
+/* Maximized preview: hide the editor pane and statusbar, expand preview to full
+   width. The topbar stays visible. Transient — toggled from the preview-toolbar. */
+body.preview-maximized .editor { display: none; }
+body.preview-maximized .statusbar { display: none; }
+body.preview-maximized .preview {
+  flex: 1 1 100%;
+  border-left: 0;
 }
 
 /* Shared look for the "+ Add Slice" button and the per-slice "+ Add" summary. */
