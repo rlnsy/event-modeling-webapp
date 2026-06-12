@@ -339,6 +339,9 @@
   function makeCard(type, title, body, item, isAuth, ctx) {
     const card = document.createElement("div");
     card.className = "card type-" + type + (isAuth ? " auth" : "");
+    // A list read model is drawn as a stack of cards (see styles.css) to signal
+    // it holds a collection of records rather than a single one.
+    if (type === "readmodel" && item && item.listElement) card.classList.add("is-list");
     // Mark traced consumers that have an information-completeness gap.
     if (item && item.id && completenessFlags.has(item.id)) card.classList.add("has-gap");
     card.tabIndex = 0;
