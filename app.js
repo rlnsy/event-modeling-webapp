@@ -247,22 +247,44 @@
   }
 
   // One field line: name, type, flag badges, and example value when present.
+  // When the field carries `subfields` (a nested object), a disclosure toggle is
+  // prepended and the subfields render as a collapsible, indented nested list —
+  // recursively, so each deeper Custom field gets its own toggle.
   function fieldLine(f) {
     const li = document.createElement("li");
     if (!f || typeof f !== "object") {
       li.textContent = "?";
       return li;
     }
+    const subfields = asArray(f.subfields).filter((s) => s && typeof s === "object");
+    const hasSub = subfields.length > 0;
+
+    // The header row holds toggle + name + type + flags + example. Kept as its
+    // own element so the nested list can sit beneath it inside the same <li>.
+    const head = hasSub ? document.createElement("div") : li;
+    if (hasSub) {
+      head.className = "f-head";
+      li.classList.add("has-sub");
+    }
+
+    let toggle = null;
+    if (hasSub) {
+      toggle = document.createElement("span");
+      toggle.className = "f-toggle";
+      toggle.textContent = "▾";
+      head.appendChild(toggle);
+    }
+
     const name = document.createElement("span");
     name.className = "f-name";
     name.textContent = f.name != null ? String(f.name) : "?";
-    li.appendChild(name);
+    head.appendChild(name);
 
     if (f.type != null) {
       const ty = document.createElement("span");
       ty.className = "f-type";
       ty.textContent = String(f.type);
-      li.appendChild(ty);
+      head.appendChild(ty);
     }
 
     const flags = [];
@@ -275,7 +297,7 @@
       const b = document.createElement("span");
       b.className = "f-flag";
       b.textContent = fl;
-      li.appendChild(b);
+      head.appendChild(b);
     }
 
     const ex = exampleText(f.example);
@@ -283,8 +305,24 @@
       const e = document.createElement("span");
       e.className = "f-ex";
       e.textContent = "= " + ex;
-      li.appendChild(e);
+      head.appendChild(e);
     }
+
+    if (!hasSub) return li;
+
+    // Nest the subfields under this line and wire the toggle to collapse them.
+    // Default expanded so structure is visible on load.
+    li.appendChild(head);
+    const sub = document.createElement("ul");
+    sub.className = "card-fields card-subfields";
+    for (const s of subfields) sub.appendChild(fieldLine(s));
+    li.appendChild(sub);
+
+    toggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const collapsed = li.classList.toggle("collapsed");
+      toggle.textContent = collapsed ? "▸" : "▾";
+    });
     return li;
   }
 
@@ -1181,9 +1219,29 @@
     return false;
   }
 
-  // One finding per unsourced consumer field, plus a lower-severity finding per
-  // field whose name matches an upstream field but whose type drifts. `generated`
-  // fields are system-produced and exempt (mirrors eventFieldsOf's copy behavior).
+  // Flatten a field list to its leaf fields, descending through any field that
+  // carries `subfields` (a nested object / Custom container). A container is
+  // structure, not data — the values that get sourced live in its leaves — so
+  // completeness is traced against leaves, not container names. Each leaf is
+  // returned with a dotted `path` (e.g. "posts.title") for clear findings.
+  function leafFields(fields, prefix) {
+    const out = [];
+    for (const f of asArray(fields)) {
+      if (!f || !f.name) continue;
+      const path = prefix ? prefix + "." + f.name : f.name;
+      const subs = asArray(f.subfields).filter((s) => s && s.name);
+      if (subs.length) out.push(...leafFields(subs, path));
+      else out.push({ field: f, path });
+    }
+    return out;
+  }
+
+  // One finding per unsourced consumer leaf field, plus a lower-severity finding
+  // per leaf whose name matches an upstream field but whose type drifts.
+  // `generated` fields are system-produced and exempt (mirrors eventFieldsOf's
+  // copy behavior). Container fields (those with subfields) are traced through
+  // to their leaves, so a list of records resolves against the events that
+  // source the record's fields rather than the container's own name.
   function completenessFindings(model) {
     const entries = collectElements(model);
     const { inbound, outbound } = buildFlowGraph(model);
@@ -1204,23 +1262,24 @@
       // not a consumer — so it has nothing to trace against.
       if (el.type === "EVENT" && srcEls.length === 0) continue;
 
-      // Available upstream fields: name -> set of types offered by any source.
+      // Available upstream fields: leaf name -> set of types offered by any
+      // source. Sources are flattened to leaves too, so a source that nests its
+      // data still contributes the leaf names a consumer can draw from.
       const available = new Map();
       for (const src of srcEls) {
-        for (const f of asArray(src.fields)) {
-          if (!f || !f.name) continue;
+        for (const { field: f } of leafFields(src.fields)) {
           let types = available.get(f.name);
           if (!types) { types = new Set(); available.set(f.name, types); }
           if (f.type != null) types.add(f.type);
         }
       }
 
-      for (const f of asArray(el.fields)) {
-        if (!f || !f.name || f.generated) continue;
+      for (const { field: f, path } of leafFields(el.fields)) {
+        if (f.generated) continue;
         if (!available.has(f.name)) {
           findings.push({
             kind: "warning", locLabel: "completeness", elementId: el.id,
-            msg: `${label} '${title}': field '${f.name}' has no upstream source.`,
+            msg: `${label} '${title}': field '${path}' has no upstream source.`,
           });
           continue;
         }
@@ -1229,7 +1288,7 @@
         if (f.type != null && types.size > 0 && !types.has(f.type)) {
           findings.push({
             kind: "warning", locLabel: "type", elementId: el.id,
-            msg: `${label} '${title}': field '${f.name}' type ${f.type} differs from upstream type ${Array.from(types).join(" / ")}.`,
+            msg: `${label} '${title}': field '${path}' type ${f.type} differs from upstream type ${Array.from(types).join(" / ")}.`,
           });
         }
       }

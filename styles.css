@@ -341,6 +341,28 @@ button:disabled:hover {
   font-size: 9.5px;
   letter-spacing: 0.2px;
 }
+/* Nested object fields: the <li> stacks its header row over an indented,
+   collapsible list of subfields. */
+.card .card-fields li.has-sub { display: block; }
+.card .f-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px;
+}
+.card .f-toggle {
+  cursor: pointer;
+  color: var(--fg-faint);
+  font-size: 9px;
+  line-height: 16px;
+  user-select: none;
+}
+.card .card-subfields {
+  margin: 2px 0 2px 9px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+.card .card-fields li.has-sub.collapsed > .card-subfields { display: none; }
 .card .spec-group {
   margin-top: 4px;
   font-size: 11px;
@@ -819,6 +841,37 @@ input[type="checkbox"].form-input {
   font-weight: 600;
 }
 .add-field-btn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+
+/* Nested object editing: a field item stacks its input row over an indented,
+   collapsible subfield area, shown only for Custom-typed fields. */
+.field-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-toggle {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 0;
+  color: var(--fg-faint);
+  font-size: 11px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+/* Reserve the toggle's width on non-Custom rows so inputs stay aligned. */
+.field-item:not(.has-sub) > .field-row > .field-toggle { visibility: hidden; }
+.field-subrows {
+  margin-left: 18px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-item:not(.has-sub) > .field-subrows { display: none; }
+.field-item.collapsed > .field-subrows { display: none; }
+.add-subfield-btn { padding: 3px 9px; font-size: 11px; }
 
 .dep-rows {
   display: flex;

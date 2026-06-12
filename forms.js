@@ -215,9 +215,24 @@
   // it and the row's × button can remove it. `showGenerated` adds the "gen"
   // toggle, which only makes sense for event fields (system-produced values).
   // `initial` pre-populates the row (used when copying fields from an event).
+  //
+  // A `Custom` field models a nested object: the row reveals an indented,
+  // collapsible "+ subfield" area whose rows are produced by recursing into this
+  // same function, so subfields nest arbitrarily deep. Switching the type away
+  // from Custom hides (but keeps) the child rows so toggling back restores them.
   function addFieldRow(rowsEl, rows, showGenerated, initial) {
+    // Wrapper stacks the input row above its nested subfield area.
+    const item = document.createElement("div");
+    item.className = "field-item";
+
     const row = document.createElement("div");
     row.className = "field-row";
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "field-toggle";
+    toggle.title = "Collapse/expand subfields";
+    toggle.textContent = "▾";
 
     const name = document.createElement("input");
     name.type = "text";
@@ -241,14 +256,43 @@
     remove.title = "Remove field";
     remove.textContent = "×";
 
-    row.append(name, type, card, opt.wrap, idf.wrap);
+    row.append(toggle, name, type, card, opt.wrap, idf.wrap);
     if (gen) row.append(gen.wrap);
     row.append(remove);
 
+    // Nested subfield area (only meaningful for Custom fields).
+    const sub = document.createElement("div");
+    sub.className = "field-subrows";
+    const subRowsEl = document.createElement("div");
+    subRowsEl.className = "field-rows";
+    const childRows = [];
+    const addSub = document.createElement("button");
+    addSub.type = "button";
+    addSub.className = "add-field-btn add-subfield-btn";
+    addSub.textContent = "+ subfield";
+    addSub.addEventListener("click", () =>
+      addFieldRow(subRowsEl, childRows, showGenerated)
+    );
+    sub.append(subRowsEl, addSub);
+
+    item.append(row, sub);
+
+    // Show the toggle + subfield area only when the type is Custom.
+    function syncCustom() {
+      item.classList.toggle("has-sub", type.value === "Custom");
+    }
+    type.addEventListener("change", syncCustom);
+    toggle.addEventListener("click", () => {
+      const collapsed = item.classList.toggle("collapsed");
+      toggle.textContent = collapsed ? "▸" : "▾";
+    });
+
     const entry = {
-      el: row,
+      el: item,
+      // Child field rows, read recursively by collectFields for Custom fields.
+      childRows,
       // The field this row was seeded from (edit/copy), so collectFields can
-      // preserve attributes the editor doesn't expose (example, subfields, …).
+      // preserve attributes the editor doesn't expose (example, mapping, …).
       source: initial || null,
       read: () => ({
         name: name.value.trim(),
@@ -262,7 +306,7 @@
     remove.addEventListener("click", () => {
       const i = rows.indexOf(entry);
       if (i >= 0) rows.splice(i, 1);
-      row.remove();
+      item.remove();
     });
 
     if (initial) {
@@ -272,10 +316,17 @@
       opt.cb.checked = !!initial.optional;
       idf.cb.checked = !!initial.idAttribute;
       if (gen) gen.cb.checked = !!initial.generated;
+      // Rebuild nested subfields so the editor reconstructs nested data on open.
+      if (Array.isArray(initial.subfields)) {
+        for (const sf of initial.subfields) {
+          addFieldRow(subRowsEl, childRows, showGenerated, sf);
+        }
+      }
     }
+    syncCustom();
 
     rows.push(entry);
-    rowsEl.appendChild(row);
+    rowsEl.appendChild(item);
     if (!initial) name.focus();
   }
 
@@ -289,13 +340,14 @@
   // Gather field rows into schema-valid Field objects, dropping nameless rows
   // and omitting attributes left at their defaults to keep the JSON clean. When
   // a row was seeded from an existing field (`source`), the managed values are
-  // merged onto a clone of it so unmanaged attributes (example, subfields,
-  // mapping, technicalAttribute, schema) survive the round-trip.
+  // merged onto a clone of it so unmanaged attributes (example, mapping,
+  // technicalAttribute, schema) survive the round-trip. Recurses into a row's
+  // child rows for Custom fields to build their `subfields`.
   function collectFields(rows) {
     return rows
-      .map((r) => ({ v: r.read(), source: r.source }))
+      .map((r) => ({ v: r.read(), source: r.source, childRows: r.childRows }))
       .filter((r) => r.v.name !== "")
-      .map(({ v, source }) => {
+      .map(({ v, source, childRows }) => {
         const f = source ? { ...source } : {};
         f.name = v.name;
         f.type = v.type;
@@ -303,6 +355,13 @@
         setOrDelete(f, "idAttribute", v.idAttribute);
         setOrDelete(f, "generated", v.generated);
         setOrDelete(f, "cardinality", v.cardinality === "List" ? "List" : null);
+        // Subfields are editor-managed for Custom fields only; for other types
+        // any subfields on `source` ride along untouched via the clone above.
+        if (v.type === "Custom") {
+          const subs = collectFields(childRows || []);
+          if (subs.length) f.subfields = subs;
+          else delete f.subfields;
+        }
         return f;
       });
   }
