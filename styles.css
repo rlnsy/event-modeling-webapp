@@ -127,6 +127,12 @@ button {
 }
 button:hover { background: var(--btn-hover); }
 button:active { background: var(--btn-active); }
+button:disabled,
+button:disabled:hover {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--line);
+}
 
 /* Session controls: a switcher plus New/Rename/Delete, set off from the
    Format/Clear actions by a thin divider. */

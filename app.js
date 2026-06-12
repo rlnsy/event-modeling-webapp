@@ -11,6 +11,7 @@
   const problemsList = document.getElementById("problemsList");
   const formatBtn = document.getElementById("formatBtn");
   const clearBtn = document.getElementById("clearBtn");
+  const downloadBtn = document.getElementById("downloadBtn");
   const themeToggle = document.getElementById("themeToggle");
   const sessionSelect = document.getElementById("sessionSelect");
   const newSessionBtn = document.getElementById("newSessionBtn");
@@ -984,11 +985,73 @@
     return findings;
   }
 
+  // ---------- Download ----------
+  // The Download button exports the active session, pretty-printed, but only
+  // when the document is fully schema-valid. `schemaValid` is the single source
+  // of truth, updated by the validate cycle below; the button reads it.
+
+  const DOWNLOAD_DISABLED_TIP = "Fix validation errors to enable download";
+  let schemaValid = false;
+
+  // Reflect schema validity into the Download button's enabled state + tooltip.
+  function setSchemaValid(ok) {
+    schemaValid = ok;
+    if (!downloadBtn) return;
+    downloadBtn.disabled = !ok;
+    downloadBtn.title = ok ? "Download session as JSON" : DOWNLOAD_DISABLED_TIP;
+  }
+
+  // Turn a session name into a filename stem: lowercase, non-alphanumerics to
+  // hyphens, collapsed and trimmed. Empty or "Untitled" falls back to a default.
+  function slugifySessionName(name) {
+    const slug = String(name || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return slug && slug !== "untitled" ? slug : "event-model";
+  }
+
+  // Today's local date as YYYY-MM-DD.
+  function todayStamp() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  // Export the active document as a pretty-printed .json download. Guarded by the
+  // disabled state, but re-checks parse/validity so a stale click can't export junk.
+  function downloadActive() {
+    if (!schemaValid) return;
+    let pretty;
+    try {
+      pretty = JSON.stringify(JSON.parse(input.value), null, 2);
+    } catch (_) {
+      return; // unparseable — nothing safe to export
+    }
+    const session = Sessions.get(activeId);
+    const stem = slugifySessionName(session && session.name);
+    const filename = `${stem}-${todayStamp()}.json`;
+
+    const blob = new Blob([pretty], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   // ---------- Main validate cycle ----------
 
   function validate() {
     const text = input.value;
     const errorLines = new Set();
+
+    // Assume invalid until the schema-valid path is reached; this keeps the
+    // Download button disabled for empty/unparseable/schema-error documents.
+    setSchemaValid(false);
 
     if (text.trim() === "") {
       setStatus("", "Empty", "");
@@ -1050,7 +1113,8 @@
     }
 
     // Schema-valid: completeness warnings never block — the model is still
-    // "Valid" and saves/exports. They surface in the problems panel only.
+    // "Valid" and saves/exports, so the Download button is enabled here.
+    setSchemaValid(true);
     if (completenessWarnings.length) {
       const n = completenessWarnings.length;
       setStatus("ok", "Valid", `${n} completeness warning${n > 1 ? "s" : ""}`);
@@ -1190,6 +1254,7 @@
   }
 
   formatBtn.addEventListener("click", format);
+  downloadBtn.addEventListener("click", downloadActive);
   clearBtn.addEventListener("click", () => {
     input.value = "";
     input.focus();
