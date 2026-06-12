@@ -18,6 +18,7 @@
   const renameSessionBtn = document.getElementById("renameSessionBtn");
   const deleteSessionBtn = document.getElementById("deleteSessionBtn");
   const preview = document.getElementById("preview");
+  const editor = document.getElementById("editor");
   const modalBackdrop = document.getElementById("modalBackdrop");
   const modalTitle = document.getElementById("modalTitle");
   const modalBody = document.getElementById("modalBody");
@@ -913,6 +914,7 @@
     maximized = !!on;
     document.body.classList.toggle("preview-maximized", maximized);
     updateMaximizeBtn();
+    if (!maximized) sizeEditor(); // editor is back; refit it to its text
   }
 
   // Esc exits fullscreen (only acts while maximized).
@@ -1299,6 +1301,8 @@
     const text = input.value;
     const errorLines = new Set();
 
+    sizeEditor(); // refit the editor pane on every path (load, format, clear, typing)
+
     // Assume invalid until the schema-valid path is reached; this keeps the
     // Download button disabled for empty/unparseable/schema-error documents.
     setSchemaValid(false);
@@ -1382,6 +1386,46 @@
     gutter.scrollTop = input.scrollTop;
   }
 
+  // ---------- Editor sizing ----------
+  // Size the editor pane to fit the longest line of JSON so the preview can use
+  // the rest of the width. A textarea's own scrollWidth is floored at its
+  // clientWidth (it reports the box, not the text), so we measure the text in a
+  // detached <pre> that shrink-wraps to its content and read its offsetWidth.
+  const measurePre = document.createElement("pre");
+  measurePre.setAttribute("aria-hidden", "true");
+  measurePre.style.cssText =
+    "position:absolute; top:0; left:-9999px; visibility:hidden; margin:0; " +
+    "white-space:pre; pointer-events:none;";
+  document.body.appendChild(measurePre);
+
+  function measureTextWidth(text) {
+    const cs = getComputedStyle(input);
+    measurePre.style.fontFamily = cs.fontFamily;
+    measurePre.style.fontSize = cs.fontSize;
+    measurePre.style.fontWeight = cs.fontWeight;
+    measurePre.style.letterSpacing = cs.letterSpacing;
+    measurePre.style.tabSize = cs.tabSize;
+    measurePre.style.paddingLeft = cs.paddingLeft;
+    measurePre.style.paddingRight = cs.paddingRight;
+    // A trailing space keeps a non-empty box so the caret column is reachable.
+    measurePre.textContent = (text || "") + " ";
+    return measurePre.offsetWidth;
+  }
+
+  function sizeEditor() {
+    if (maximized) return; // editor is hidden; nothing to size
+    const wrap = editor.parentElement; // .editor-wrap
+    const wrapW = wrap.clientWidth;
+    if (!wrapW) return;
+    const gutterW = gutter.offsetWidth;
+    // A few px of slack for the caret and a possible vertical scrollbar.
+    const ideal = measureTextWidth(input.value) + gutterW + 4;
+    // Keep the editor usable, but never let it crowd the preview out.
+    const min = Math.min(360, wrapW * 0.3);
+    const max = wrapW * 0.6;
+    editor.style.width = Math.round(Math.max(min, Math.min(ideal, max))) + "px";
+  }
+
   // ---------- Sessions ----------
   // The active session's content is autosaved on every (debounced) edit. The
   // select, New/Rename/Delete buttons switch and manage named documents stored
@@ -1457,8 +1501,12 @@
 
   input.addEventListener("input", () => {
     renderGutter(input.value, new Set()); // keep gutter in step while typing
+    sizeEditor(); // refit the pane as the longest line changes
     scheduleValidate();
   });
+
+  // Refit on viewport changes (the min/max clamps are relative to the wrap width).
+  window.addEventListener("resize", sizeEditor);
   input.addEventListener("scroll", syncScroll);
 
   // Tab inserts two spaces instead of moving focus.

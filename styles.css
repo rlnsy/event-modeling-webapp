@@ -167,7 +167,11 @@ button:disabled:hover {
 
 .editor {
   display: flex;
-  flex: 1 1 55%;
+  /* Width is set by JS to fit the longest line of JSON (see sizeEditor()); this
+     is just the pre-script fallback. flex-grow stays 0 so the editor never eats
+     the leftover space — that goes to the preview. */
+  flex: 0 0 auto;
+  width: 55%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -239,7 +243,9 @@ button:disabled:hover {
 
 /* ---------- Preview pane ---------- */
 .preview {
-  flex: 1 1 45%;
+  /* Grows to fill all the horizontal space the editor doesn't claim. The editor
+     is sized to its text, so the preview gets everything else. */
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   overflow: auto;
