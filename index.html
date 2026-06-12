@@ -56,6 +56,10 @@
         <button class="modal-close" id="modalClose" type="button" aria-label="Close">&times;</button>
       </header>
       <div class="modal-body" id="modalBody"></div>
+      <footer class="modal-foot" id="modalFoot" hidden>
+        <button type="button" id="modalDelete" class="btn-danger">Delete</button>
+        <button type="button" id="modalEdit" class="btn-primary">Edit</button>
+      </footer>
     </div>
   </div>
 
@@ -69,7 +73,7 @@
       <footer class="modal-foot">
         <span class="form-error" id="formError"></span>
         <button type="button" id="formCancel" class="btn-secondary">Cancel</button>
-        <button type="submit" class="btn-primary">Add</button>
+        <button type="submit" id="formSubmit" class="btn-primary">Add</button>
       </footer>
     </form>
   </div>

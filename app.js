@@ -22,6 +22,9 @@
   const modalTitle = document.getElementById("modalTitle");
   const modalBody = document.getElementById("modalBody");
   const modalClose = document.getElementById("modalClose");
+  const modalFoot = document.getElementById("modalFoot");
+  const modalEditBtn = document.getElementById("modalEdit");
+  const modalDeleteBtn = document.getElementById("modalDelete");
 
   // ---------- Helpers ----------
 
@@ -167,6 +170,17 @@
 
   // ---------- Rendering ----------
 
+  // A standard trash-can glyph as inline SVG. Uses `currentColor` so it inherits
+  // the button's (red) text color, and is hidden from a11y tools since the
+  // button carries an aria-label.
+  const TRASH_ICON =
+    '<svg class="icon-trash" viewBox="0 0 16 16" width="12" height="12" ' +
+    'fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" ' +
+    'stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+    '<path d="M2.5 4h11"/><path d="M6 4V2.5h4V4"/>' +
+    '<path d="M3.75 4l.6 9.5h7.3l.6-9.5"/>' +
+    '<path d="M6.5 6.5v5M9.5 6.5v5"/></svg>';
+
   function lineCount(text) {
     let n = 1;
     for (let i = 0; i < text.length; i++) if (text[i] === "\n") n++;
@@ -281,7 +295,9 @@
   }
 
   // Wrap a fully-built card so clicking (or Enter/Space) opens the detail modal.
-  function makeCard(type, title, body, item, isAuth) {
+  // `ctx` (when present) locates the item in the model so the detail modal can
+  // offer Edit/Delete.
+  function makeCard(type, title, body, item, isAuth, ctx) {
     const card = document.createElement("div");
     card.className = "card type-" + type + (isAuth ? " auth" : "");
     // Mark traced consumers that have an information-completeness gap.
@@ -293,7 +309,7 @@
     t.textContent = title != null && title !== "" ? String(title) : "(untitled)";
     card.appendChild(t);
     if (body) card.appendChild(body);
-    const open = () => openDetail(type, item);
+    const open = () => openDetail(type, item, ctx);
     card.addEventListener("click", open);
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
@@ -349,29 +365,29 @@
     return img;
   }
 
-  function cardFor(type, item) {
+  function cardFor(type, item, ctx) {
     if (type === "actor") {
-      return makeCard("actor", item && item.name, null, item, !!(item && item.authRequired));
+      return makeCard("actor", item && item.name, null, item, !!(item && item.authRequired), ctx);
     }
     if (type === "screenimage") {
-      return makeCard("screenimage", item && item.title, item ? screenImageBody(item) : null, item);
+      return makeCard("screenimage", item && item.title, item ? screenImageBody(item) : null, item, false, ctx);
     }
     if (type === "specification") {
-      return makeCard("specification", item && item.title, item ? specBody(item) : null, item);
+      return makeCard("specification", item && item.title, item ? specBody(item) : null, item, false, ctx);
     }
-    return makeCard(type, item && item.title, item ? fieldList(item.fields) : null, item);
+    return makeCard(type, item && item.title, item ? fieldList(item.fields) : null, item, false, ctx);
   }
 
   // An image embedded inside a screen card. Clicking it opens the image's own
   // detail (it's slice-level data, not part of the screen element), so we stop
   // the click from bubbling up to the screen card's handler.
-  function embeddedImage(im) {
+  function embeddedImage(im, ctx) {
     const wrap = document.createElement("div");
     wrap.className = "screen-img-wrap";
     wrap.tabIndex = 0;
     wrap.setAttribute("role", "button");
     wrap.appendChild(screenImageBody(im));
-    const open = (e) => { e.stopPropagation(); openDetail("screenimage", im); };
+    const open = (e) => { e.stopPropagation(); openDetail("screenimage", im, ctx); };
     wrap.addEventListener("click", open);
     wrap.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(e); }
@@ -380,11 +396,15 @@
   }
 
   // A screen card: title, fields, then any slice screen images beneath them.
-  function screenCard(screen, images) {
+  // `ctx` locates the screen; embedded images get their own screenImages ctx.
+  function screenCard(screen, images, ctx) {
     const body = document.createDocumentFragment();
     body.appendChild(fieldList(asArray(screen && screen.fields)));
-    for (const im of asArray(images)) body.appendChild(embeddedImage(im));
-    return makeCard("screen", screen && screen.title, body, screen);
+    asArray(images).forEach((im, idx) => {
+      const imCtx = ctx ? makeCtx(ctx.sliceId, ctx.sliceIdx, "screenImages", im, idx) : null;
+      body.appendChild(embeddedImage(im, imCtx));
+    });
+    return makeCard("screen", screen && screen.title, body, screen, false, ctx);
   }
 
   // ---------- Detail modal ----------
@@ -437,17 +457,24 @@
     return obj;
   }
 
-  function openDetail(type, item) {
+  // The element currently shown in the detail modal, so the footer's Edit/Delete
+  // buttons know what to act on. Cleared when the modal opens without context.
+  let detailCtx = null;
+
+  function openDetail(type, item, ctx) {
+    detailCtx = ctx || null;
     const name = item && (item.title || item.name || item.id);
     modalTitle.textContent = (name ? String(name) : "(untitled)") +
       "  ·  " + (TYPE_LABELS[type] || type);
     modalBody.innerHTML = "";
     modalBody.appendChild(renderValue(item == null ? {} : item));
+    if (modalFoot) modalFoot.hidden = !detailCtx;
     modalBackdrop.hidden = false;
   }
 
   function closeDetail() {
     modalBackdrop.hidden = true;
+    detailCtx = null;
   }
 
   modalClose.addEventListener("click", closeDetail);
@@ -457,6 +484,8 @@
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !modalBackdrop.hidden) closeDetail();
   });
+  if (modalEditBtn) modalEditBtn.addEventListener("click", () => editComponent(detailCtx));
+  if (modalDeleteBtn) modalDeleteBtn.addEventListener("click", () => deleteComponent(detailCtx));
 
   // ---------- Adding components ----------
   // The textarea is the source of truth: every add parses it, splices the new
@@ -475,6 +504,42 @@
     table: "tables",
     specification: "specifications",
   };
+
+  // Inverse of TARGET_KEY: the slice array key -> the AddForms/edit type. Lets a
+  // rendered card (which only knows its array key) name the form type for edit.
+  const FORM_TYPE_FOR_KEY = {
+    commands: "command",
+    events: "event",
+    readmodels: "readmodel",
+    screens: "screen",
+    processors: "processor",
+    actors: "actor",
+    screenImages: "screenImage",
+    tables: "table",
+    specifications: "specification",
+  };
+
+  // Locate context for a rendered card: which slice, which array, and which item
+  // (preferring `id`, falling back to array position for id-less items / actors).
+  function makeCtx(sliceId, sliceIdx, key, item, itemIndex) {
+    return {
+      sliceId,
+      sliceIdx,
+      formType: FORM_TYPE_FOR_KEY[key],
+      itemId: item && item.id != null ? item.id : null,
+      itemIndex,
+    };
+  }
+
+  // Find an item's current position in `arr`, by id when known, else by the
+  // recorded index. Returns -1 when nothing matches.
+  function findItemIndex(arr, itemId, itemIndex) {
+    if (itemId != null) {
+      const i = arr.findIndex((x) => x && x.id === itemId);
+      if (i >= 0) return i;
+    }
+    return Number.isInteger(itemIndex) && itemIndex >= 0 && itemIndex < arr.length ? itemIndex : -1;
+  }
 
   // Parse the editor text into a model object suitable for editing, or null if
   // it can't be (syntax error, or a non-object root). An empty document is
@@ -553,6 +618,76 @@
     return wrap;
   }
 
+  // Open the slice form pre-filled to edit a slice's title/type/status/context.
+  // applyEdit preserves the slice's id, index, and child element arrays.
+  function editSlice(sliceId, sliceIdx) {
+    const snapshot = modelForEditing();
+    if (snapshot == null) {
+      setStatus("err", "Resolve JSON errors before editing", "");
+      return;
+    }
+    const slice = findSlice(snapshot, sliceId, sliceIdx);
+    if (!slice) {
+      setStatus("err", "Could not find the target slice", "");
+      return;
+    }
+    AddForms.open("slice", (obj) => {
+      const model = modelForEditing();
+      if (model == null) {
+        setStatus("err", "Resolve JSON errors before editing", "");
+        return;
+      }
+      const slices = Array.isArray(model.slices) ? model.slices : [];
+      const i = findItemIndex(slices, sliceId, sliceIdx);
+      if (i < 0) {
+        setStatus("err", "Could not find the slice to edit", "");
+        return;
+      }
+      slices[i] = obj;
+      commitModel(model);
+    }, { initial: slice });
+  }
+
+  // Remove a slice after confirmation, then renormalize the remaining slices'
+  // `index` values to their 0..N-1 display order (mirrors moveSlice).
+  function deleteSlice(sliceId, sliceIdx) {
+    const model = modelForEditing();
+    if (model == null) {
+      setStatus("err", "Resolve JSON errors before deleting", "");
+      return;
+    }
+    const slices = Array.isArray(model.slices) ? model.slices : [];
+    const i = findItemIndex(slices, sliceId, sliceIdx);
+    if (i < 0) {
+      setStatus("err", "Could not find the slice to delete", "");
+      return;
+    }
+    const name = (slices[i] && slices[i].title) || "this slice";
+    if (!window.confirm(`Delete slice "${name}"? This cannot be undone.`)) return;
+    slices.splice(i, 1);
+    orderedSlices(slices).forEach(({ s }, idx) => { if (s) s.index = idx; });
+    commitModel(model);
+  }
+
+  // ✎ / 🗑 controls in the slice header.
+  function sliceEditControls(sliceId, sliceIdx) {
+    const wrap = document.createElement("div");
+    wrap.className = "slice-edit-controls";
+    const mk = (markup, titleText, cls, fn) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "slice-edit-btn" + (cls ? " " + cls : "");
+      b.innerHTML = markup; // trusted static glyph/icon markup
+      b.title = titleText;
+      b.setAttribute("aria-label", titleText);
+      b.addEventListener("click", fn);
+      return b;
+    };
+    wrap.appendChild(mk("✎", "Edit slice", "", () => editSlice(sliceId, sliceIdx)));
+    wrap.appendChild(mk(TRASH_ICON, "Delete slice", "slice-del-btn", () => deleteSlice(sliceId, sliceIdx)));
+    return wrap;
+  }
+
   // Resolve a slice in `model` by id, falling back to its array position.
   function findSlice(model, sliceId, sliceIdx) {
     const slices = Array.isArray(model.slices) ? model.slices : [];
@@ -595,6 +730,34 @@
     return out;
   }
 
+  // Copy-fields / dependency options for a form, shared by add and edit. Commands
+  // pull their (non-generated) fields from the slice's event. Read models attach
+  // model-wide events as INBOUND dependencies and copy a chosen event's fields.
+  // Screens copy from the element that feeds them: a state-change screen from the
+  // slice's command(s), a state-view screen from the slice's read model(s). An
+  // automation copies from the command it triggers (same slice).
+  function addOptions(type, slice, model) {
+    if (type === "command") {
+      const fields = eventFieldsOf(slice);
+      if (fields.length) return { copyFromFields: fields };
+    } else if (type === "readmodel") {
+      const events = allEvents(model);
+      if (events.length) return { events };
+    } else if (type === "screen") {
+      if (slice && slice.sliceType === "STATE_VIEW") {
+        const fields = fieldsFromElements(slice.readmodels);
+        if (fields.length) return { copyFromFields: fields, copyFromLabel: "Copy fields from read model" };
+      } else if (slice && slice.sliceType === "STATE_CHANGE") {
+        const fields = fieldsFromElements(slice.commands);
+        if (fields.length) return { copyFromFields: fields, copyFromLabel: "Copy fields from command" };
+      }
+    } else if (type === "processor") {
+      const fields = fieldsFromElements(slice && slice.commands);
+      if (fields.length) return { copyFromFields: fields, copyFromLabel: "Copy fields from command" };
+    }
+    return null;
+  }
+
   // Open the add-form for `type`, targeting the slice identified by `sliceId`
   // (falling back to `sliceIdx` if the slice has no id). `type === "slice"`
   // appends to the top-level slices array instead.
@@ -605,33 +768,7 @@
       return;
     }
 
-    // Commands can pull their (non-generated) fields from the slice's event.
-    // Read models can attach model-wide events as INBOUND dependencies and
-    // copy a chosen event's fields. Screens copy from the element that feeds
-    // them: a state-change screen from the slice's command(s), a state-view
-    // screen from the slice's read model(s).
-    let options = null;
-    if (type === "command") {
-      const fields = eventFieldsOf(findSlice(snapshot, sliceId, sliceIdx));
-      if (fields.length) options = { copyFromFields: fields };
-    } else if (type === "readmodel") {
-      const events = allEvents(snapshot);
-      if (events.length) options = { events };
-    } else if (type === "screen") {
-      const slice = findSlice(snapshot, sliceId, sliceIdx);
-      if (slice && slice.sliceType === "STATE_VIEW") {
-        const fields = fieldsFromElements(slice.readmodels);
-        if (fields.length) options = { copyFromFields: fields, copyFromLabel: "Copy fields from read model" };
-      } else if (slice && slice.sliceType === "STATE_CHANGE") {
-        const fields = fieldsFromElements(slice.commands);
-        if (fields.length) options = { copyFromFields: fields, copyFromLabel: "Copy fields from command" };
-      }
-    } else if (type === "processor") {
-      // An automation copies from the command it triggers (same slice).
-      const slice = findSlice(snapshot, sliceId, sliceIdx);
-      const fields = fieldsFromElements(slice && slice.commands);
-      if (fields.length) options = { copyFromFields: fields, copyFromLabel: "Copy fields from command" };
-    }
+    const options = addOptions(type, findSlice(snapshot, sliceId, sliceIdx), snapshot);
 
     AddForms.open(type, (obj) => {
       const model = modelForEditing();
@@ -655,6 +792,70 @@
       }
       commitModel(model);
     }, options);
+  }
+
+  // Open the edit-form for the component located by `ctx`, pre-filled with its
+  // current values; on save, replace it in place and re-commit the model.
+  function editComponent(ctx) {
+    if (!ctx) return;
+    const snapshot = modelForEditing();
+    if (snapshot == null) {
+      setStatus("err", "Resolve JSON errors before editing", "");
+      return;
+    }
+    const slice = findSlice(snapshot, ctx.sliceId, ctx.sliceIdx);
+    const key = TARGET_KEY[ctx.formType];
+    const arr = slice && Array.isArray(slice[key]) ? slice[key] : [];
+    const idx = findItemIndex(arr, ctx.itemId, ctx.itemIndex);
+    if (idx < 0) {
+      setStatus("err", "Could not find the item to edit", "");
+      return;
+    }
+
+    const options = addOptions(ctx.formType, slice, snapshot) || {};
+    options.initial = arr[idx];
+
+    closeDetail();
+    AddForms.open(ctx.formType, (obj) => {
+      const model = modelForEditing();
+      if (model == null) {
+        setStatus("err", "Resolve JSON errors before editing", "");
+        return;
+      }
+      const sl = findSlice(model, ctx.sliceId, ctx.sliceIdx);
+      const a = sl && Array.isArray(sl[key]) ? sl[key] : [];
+      const i = findItemIndex(a, ctx.itemId, ctx.itemIndex);
+      if (i < 0) {
+        setStatus("err", "Could not find the item to edit", "");
+        return;
+      }
+      a[i] = obj;
+      commitModel(model);
+    }, options);
+  }
+
+  // Remove the component located by `ctx` after confirmation, then re-commit.
+  function deleteComponent(ctx) {
+    if (!ctx) return;
+    const model = modelForEditing();
+    if (model == null) {
+      setStatus("err", "Resolve JSON errors before deleting", "");
+      return;
+    }
+    const slice = findSlice(model, ctx.sliceId, ctx.sliceIdx);
+    const key = TARGET_KEY[ctx.formType];
+    const arr = slice && Array.isArray(slice[key]) ? slice[key] : [];
+    const idx = findItemIndex(arr, ctx.itemId, ctx.itemIndex);
+    if (idx < 0) {
+      setStatus("err", "Could not find the item to delete", "");
+      return;
+    }
+    const item = arr[idx];
+    const name = (item && (item.title || item.name || item.id)) || "this item";
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    arr.splice(idx, 1);
+    commitModel(model);
+    closeDetail();
   }
 
   // A per-slice "+ Add" disclosure menu listing every addable element type.
@@ -778,6 +979,7 @@
       const headActions = document.createElement("div");
       headActions.className = "slice-head-actions";
       headActions.appendChild(sliceReorderControls(slice.id, i, pos, ordered.length));
+      headActions.appendChild(sliceEditControls(slice.id, i));
       headActions.appendChild(sliceAddMenu(slice.id, i));
       header.appendChild(headActions);
       col.appendChild(header);
@@ -791,19 +993,28 @@
           // Screens render their slice's screenImages embedded under the fields.
           const screens = asArray(slice.screens);
           const images = asArray(slice.screenImages);
-          for (const sc of screens) { lane.appendChild(screenCard(sc, images)); count++; }
+          screens.forEach((sc, idx) => {
+            lane.appendChild(screenCard(sc, images, makeCtx(slice.id, i, "screens", sc, idx)));
+            count++;
+          });
           // No screen to host them: show images on their own so they aren't lost.
           if (screens.length === 0) {
-            for (const im of images) { lane.appendChild(cardFor("screenimage", im)); count++; }
+            images.forEach((im, idx) => {
+              lane.appendChild(cardFor("screenimage", im, makeCtx(slice.id, i, "screenImages", im, idx)));
+              count++;
+            });
           }
-          for (const pr of asArray(slice.processors)) { lane.appendChild(cardFor("automation", pr)); count++; }
+          asArray(slice.processors).forEach((pr, idx) => {
+            lane.appendChild(cardFor("automation", pr, makeCtx(slice.id, i, "processors", pr, idx)));
+            count++;
+          });
         } else {
           for (const key of laneDef.keys) {
             const type = (laneDef.typeFor && laneDef.typeFor[key]) || laneDef.type;
-            for (const item of asArray(slice[key])) {
-              lane.appendChild(cardFor(type, item));
+            asArray(slice[key]).forEach((item, idx) => {
+              lane.appendChild(cardFor(type, item, makeCtx(slice.id, i, key, item, idx)));
               count++;
-            }
+            });
           }
         }
 

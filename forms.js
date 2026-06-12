@@ -135,6 +135,56 @@
     return null;
   }
 
+  // Apply collected form values onto an existing object for an edit. Clones the
+  // original and overwrites only the keys the form manages, so the object's id,
+  // child arrays, and any properties the form doesn't expose are preserved.
+  function applyEdit(type, initial, v) {
+    const o = { ...initial };
+    if (type === "slice") {
+      o.title = v.title;
+      o.sliceType = v.sliceType;
+      setOrDelete(o, "status", v.status);
+      setOrDelete(o, "context", v.context);
+      return o;
+    }
+    if (ELEMENT_TYPE[type]) {
+      o.title = v.title;
+      o.fields = Array.isArray(v.fields) ? v.fields : [];
+      setOrDelete(o, "description", v.description);
+      if (type === "readmodel") {
+        // The dependency editor is the source of truth for a read model's
+        // dependencies — but only when it was rendered (it needs model-wide
+        // events). When absent, leave the existing dependencies untouched rather
+        // than wiping them. Other element types keep theirs untouched too.
+        if ("dependencies" in v) {
+          o.dependencies = Array.isArray(v.dependencies) ? v.dependencies : [];
+        }
+        setOrDelete(o, "listElement", v.listElement);
+      }
+      return o;
+    }
+    if (type === "actor") {
+      o.name = v.name;
+      o.authRequired = !!v.authRequired;
+      return o;
+    }
+    if (type === "screenImage") {
+      o.title = v.title;
+      setOrDelete(o, "url", v.url);
+      return o;
+    }
+    if (type === "table") {
+      o.title = v.title;
+      o.fields = Array.isArray(v.fields) ? v.fields : [];
+      return o;
+    }
+    if (type === "specification") {
+      o.title = v.title;
+      return o;
+    }
+    return o;
+  }
+
   // ---------- Field editor (repeatable rows) ----------
 
   function selectEl(options) {
@@ -197,6 +247,9 @@
 
     const entry = {
       el: row,
+      // The field this row was seeded from (edit/copy), so collectFields can
+      // preserve attributes the editor doesn't expose (example, subfields, …).
+      source: initial || null,
       read: () => ({
         name: name.value.trim(),
         type: type.value,
@@ -226,18 +279,30 @@
     if (!initial) name.focus();
   }
 
+  // Set `o[key]` to `val` when truthy, otherwise remove the key. Keeps edited
+  // objects clean (an unchecked flag disappears rather than becoming `false`).
+  function setOrDelete(o, key, val) {
+    if (val) o[key] = val;
+    else delete o[key];
+  }
+
   // Gather field rows into schema-valid Field objects, dropping nameless rows
-  // and omitting attributes left at their defaults to keep the JSON clean.
+  // and omitting attributes left at their defaults to keep the JSON clean. When
+  // a row was seeded from an existing field (`source`), the managed values are
+  // merged onto a clone of it so unmanaged attributes (example, subfields,
+  // mapping, technicalAttribute, schema) survive the round-trip.
   function collectFields(rows) {
     return rows
-      .map((r) => r.read())
-      .filter((r) => r.name !== "")
-      .map((r) => {
-        const f = { name: r.name, type: r.type };
-        if (r.optional) f.optional = true;
-        if (r.idAttribute) f.idAttribute = true;
-        if (r.generated) f.generated = true;
-        if (r.cardinality === "List") f.cardinality = "List";
+      .map((r) => ({ v: r.read(), source: r.source }))
+      .filter((r) => r.v.name !== "")
+      .map(({ v, source }) => {
+        const f = source ? { ...source } : {};
+        f.name = v.name;
+        f.type = v.type;
+        setOrDelete(f, "optional", v.optional);
+        setOrDelete(f, "idAttribute", v.idAttribute);
+        setOrDelete(f, "generated", v.generated);
+        setOrDelete(f, "cardinality", v.cardinality === "List" ? "List" : null);
         return f;
       });
   }
@@ -260,10 +325,12 @@
   // button reveals a scrollable list of every event in the model. Selecting one
   // adds a row contributing { id, type: "INBOUND", title, elementType: "EVENT" }
   // and exposing a per-row "Copy fields" button that seeds the field editor from
-  // that specific event. Returns { section, read } where read() yields the
-  // Dependency objects in row order.
-  function buildDependencySection(events, fieldEditor) {
+  // that specific event. When editing, `initialDeps` pre-populates the rows.
+  // Returns { section, read } where read() yields the Dependency objects in row
+  // order.
+  function buildDependencySection(events, fieldEditor, initialDeps) {
     const depRows = [];
+    const eventById = new Map(events.map((ev) => [ev.id, ev]));
 
     const section = document.createElement("div");
     section.className = "form-row field-section";
@@ -288,19 +355,18 @@
     selector.hidden = true;
     addBtn.addEventListener("click", () => { selector.hidden = !selector.hidden; });
 
-    function addDepRow(ev) {
+    // Add a row for a dependency object. The matching event (looked up by id) is
+    // used for the "Copy fields" button; if it isn't in the model, the row still
+    // renders from the stored title and Copy is omitted.
+    function addDepRow(dep) {
+      const ev = eventById.get(dep.id) || null;
+
       const row = document.createElement("div");
       row.className = "dep-row";
 
       const name = document.createElement("span");
       name.className = "dep-name";
-      name.textContent = ev.title || ev.id;
-
-      const copyBtn = document.createElement("button");
-      copyBtn.type = "button";
-      copyBtn.className = "add-field-btn";
-      copyBtn.textContent = "Copy fields";
-      copyBtn.addEventListener("click", () => copyEventFields(ev, fieldEditor));
+      name.textContent = dep.title || (ev && ev.title) || dep.id;
 
       const remove = document.createElement("button");
       remove.type = "button";
@@ -308,12 +374,18 @@
       remove.title = "Remove dependency";
       remove.textContent = "×";
 
-      row.append(name, copyBtn, remove);
+      if (ev) {
+        const copyBtn = document.createElement("button");
+        copyBtn.type = "button";
+        copyBtn.className = "add-field-btn";
+        copyBtn.textContent = "Copy fields";
+        copyBtn.addEventListener("click", () => copyEventFields(ev, fieldEditor));
+        row.append(name, copyBtn, remove);
+      } else {
+        row.append(name, remove);
+      }
 
-      const entry = {
-        el: row,
-        dep: { id: ev.id, type: "INBOUND", title: ev.title || "", elementType: "EVENT" },
-      };
+      const entry = { el: row, dep };
       remove.addEventListener("click", () => {
         const i = depRows.indexOf(entry);
         if (i >= 0) depRows.splice(i, 1);
@@ -330,12 +402,17 @@
       opt.className = "dep-option";
       opt.textContent = ev.title || ev.id;
       opt.addEventListener("click", () => {
-        addDepRow(ev);
+        addDepRow({ id: ev.id, type: "INBOUND", title: ev.title || "", elementType: "EVENT" });
         selector.hidden = true;
       });
       selector.appendChild(opt);
     }
     section.appendChild(selector);
+
+    // Seed existing dependencies when editing.
+    for (const dep of (Array.isArray(initialDeps) ? initialDeps : [])) {
+      if (dep && dep.id != null) addDepRow(dep);
+    }
 
     return { section, read: () => depRows.map((r) => r.dep) };
   }
@@ -349,6 +426,7 @@
   const errorEl = document.getElementById("formError");
   const closeBtn = document.getElementById("formClose");
   const cancelBtn = document.getElementById("formCancel");
+  const submitBtn = document.getElementById("formSubmit");
 
   // Set while the modal is open; reads the inputs, validates, builds, and hands
   // the object to the caller's onSubmit.
@@ -372,8 +450,13 @@
     const specs = SPECS[type];
     if (!specs) return;
     const opts = options || {};
+    // When `opts.initial` is supplied the form runs in edit mode: inputs are
+    // pre-populated and submit yields a merged object via applyEdit.
+    const initial = opts.initial || null;
+    const editing = !!initial;
 
-    titleEl.textContent = "Add " + (TYPE_TITLES[type] || type);
+    titleEl.textContent = (editing ? "Edit " : "Add ") + (TYPE_TITLES[type] || type);
+    if (submitBtn) submitBtn.textContent = editing ? "Save" : "Add";
     bodyEl.innerHTML = "";
     errorEl.textContent = "";
 
@@ -435,6 +518,10 @@
         section.appendChild(actions);
 
         readers[spec.key] = () => collectFields(rows);
+        // Seed existing fields when editing.
+        if (editing && Array.isArray(initial.fields)) {
+          for (const f of initial.fields) addFieldRow(rowsEl, rows, showGenerated, f);
+        }
         bodyEl.appendChild(section);
         continue;
       }
@@ -462,6 +549,12 @@
       }
       readers[spec.key] = () => (spec.kind === "checkbox" ? el.checked : el.value.trim());
 
+      // Pre-populate from the edited object.
+      if (editing && initial[spec.key] != null) {
+        if (spec.kind === "checkbox") el.checked = !!initial[spec.key];
+        else el.value = initial[spec.key];
+      }
+
       // Checkbox reads better with the control before the label.
       if (spec.kind === "checkbox") {
         row.appendChild(el);
@@ -477,7 +570,7 @@
     // Rendered above the field editor so "Copy fields" reads naturally.
     const events = Array.isArray(opts.events) ? opts.events : [];
     if (type === "readmodel" && events.length) {
-      const deps = buildDependencySection(events, fieldEditor);
+      const deps = buildDependencySection(events, fieldEditor, editing ? initial.dependencies : null);
       if (fieldEditor && fieldEditor.sectionEl) {
         bodyEl.insertBefore(deps.section, fieldEditor.sectionEl);
       } else {
@@ -495,7 +588,7 @@
           return;
         }
       }
-      const obj = build(type, values);
+      const obj = editing ? applyEdit(type, initial, values) : build(type, values);
       close();
       onSubmit(obj);
     };

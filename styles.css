@@ -598,20 +598,23 @@ summary.add-btn { user-select: none; }
 summary.add-btn::-webkit-details-marker { display: none; }
 summary.add-btn::marker { content: ""; }
 
-/* Slice header now carries the add menu to the right of the title block. */
+/* Slice header carries the action controls below the title block; the narrow
+   slice column can't fit them inline, so the title takes the full first row and
+   the actions wrap onto their own row. */
 .slice-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
-.slice-head-main { min-width: 0; }
+.slice-head-main { min-width: 0; flex: 1 1 100%; }
 
 .slice-head-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  flex: 0 0 auto;
+  width: 100%;
 }
 
 /* ◀ / ▶ slice reorder buttons. */
@@ -715,6 +718,38 @@ input[type="checkbox"].form-input {
 }
 .btn-primary:hover { background: var(--accent-hover); }
 .btn-secondary { background: var(--line); }
+.btn-danger {
+  background: color-mix(in srgb, var(--err) 14%, transparent);
+  color: var(--err);
+  border: 1px solid color-mix(in srgb, var(--err) 35%, transparent);
+}
+.btn-danger:hover { background: color-mix(in srgb, var(--err) 24%, transparent); }
+
+/* Detail-modal footer: Delete pinned left, Edit right. */
+#modalFoot { justify-content: flex-end; }
+#modalFoot #modalDelete { margin-right: auto; }
+
+/* ✎ / 🗑 slice edit + delete buttons in the slice header. */
+.slice-edit-controls { display: flex; gap: 4px; }
+.slice-edit-btn {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.slice-edit-btn { display: inline-flex; align-items: center; justify-content: center; }
+.slice-edit-btn .icon-trash { display: block; }
+.slice-edit-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.slice-edit-btn.slice-del-btn {
+  background: color-mix(in srgb, var(--err) 12%, transparent);
+  color: var(--err);
+  border-color: color-mix(in srgb, var(--err) 30%, transparent);
+}
+.slice-edit-btn.slice-del-btn:hover { background: color-mix(in srgb, var(--err) 22%, transparent); }
 
 /* Roomier modal for the element forms that carry the field editor. */
 #addForm { width: min(680px, 100%); }
