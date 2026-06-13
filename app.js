@@ -987,36 +987,65 @@
     return det;
   }
 
-  // ---------- Fullscreen (maximized preview) ----------
-  // Transient view state: maximize the preview to fill the working area below the
-  // topbar for presenting/reviewing. Held in memory only — not persisted, and
-  // reset on reload and session switch. The editor (and statusbar) hide while
-  // maximized, so the model is read-only until fullscreen is exited.
+  // ---------- Editor visibility ----------
+  // The visualizer fills the full width by default; the JSON text editor stays
+  // hidden until the user opts in via the edit toggle in the preview's top-left
+  // corner. Transient view state — held in memory only, not persisted, and reset
+  // to hidden on reload.
 
-  let maximized = false;
-  let maximizeBtn = null; // the button in the most recently rendered toolbar
+  let editorHidden = true;
+  let editToggleBtn = null; // the pencil button in the most recently rendered toolbar
+  const paneToggle = document.getElementById("paneToggle"); // collapse handle on the divider
 
-  // Sync the toolbar button's icon/labels to the current state.
-  function updateMaximizeBtn() {
-    if (!maximizeBtn) return;
-    maximizeBtn.textContent = maximized ? "⤡" : "⤢";
-    const label = maximized ? "Exit fullscreen (Esc)" : "Maximize preview";
-    maximizeBtn.title = label;
-    maximizeBtn.setAttribute("aria-label", label);
-    maximizeBtn.setAttribute("aria-pressed", maximized ? "true" : "false");
+  function svg(path) {
+    return (
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + "</svg>"
+    );
   }
 
-  function setMaximized(on) {
-    maximized = !!on;
-    document.body.classList.toggle("preview-maximized", maximized);
-    updateMaximizeBtn();
-    if (!maximized) sizeEditor(); // editor is back; refit it to its text
+  // Pencil/edit icon for the toolbar toggle.
+  const EDIT_ICON = svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>');
+  // Chevrons for the divider handle: point in the direction the divider will move.
+  const CHEVRON_LEFT = svg('<path d="m15 18-6-6 6-6"/>');
+  const CHEVRON_RIGHT = svg('<path d="m9 18 6-6-6-6"/>');
+
+  // Sync the pencil toolbar button to the current visibility.
+  function updateEditToggleBtn() {
+    if (!editToggleBtn) return;
+    const label = editorHidden ? "Show editor" : "Hide editor";
+    editToggleBtn.title = label;
+    editToggleBtn.setAttribute("aria-label", label);
+    editToggleBtn.setAttribute("aria-pressed", editorHidden ? "false" : "true");
+    editToggleBtn.classList.toggle("active", !editorHidden);
   }
 
-  // Esc exits fullscreen (only acts while maximized).
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && maximized) setMaximized(false);
-  });
+  // Sync the divider collapse handle: a right chevron invites expansion when the
+  // editor is hidden; a left chevron collapses it back when visible.
+  function updatePaneToggle() {
+    if (!paneToggle) return;
+    paneToggle.innerHTML = editorHidden ? CHEVRON_RIGHT : CHEVRON_LEFT;
+    const label = editorHidden ? "Show editor" : "Hide editor";
+    paneToggle.title = label;
+    paneToggle.setAttribute("aria-label", label);
+    paneToggle.setAttribute("aria-expanded", editorHidden ? "false" : "true");
+  }
+
+  function setEditorHidden(on) {
+    editorHidden = !!on;
+    document.body.classList.toggle("editor-hidden", editorHidden);
+    updateEditToggleBtn();
+    updatePaneToggle();
+    if (!editorHidden) sizeEditor(); // editor is back; refit it to its text
+  }
+
+  if (paneToggle) {
+    paneToggle.addEventListener("click", () => setEditorHidden(!editorHidden));
+  }
+
+  // Full-width visualizer is the default view.
+  document.body.classList.add("editor-hidden");
+  updatePaneToggle();
 
   function renderModel(parsed) {
     preview.innerHTML = "";
@@ -1024,20 +1053,22 @@
     // Always offer a global "Add Slice" so an empty document can be bootstrapped.
     const toolbar = document.createElement("div");
     toolbar.className = "preview-toolbar";
+
+    // Edit toggle pinned to the top-left corner: shows/hides the JSON editor.
+    editToggleBtn = document.createElement("button");
+    editToggleBtn.type = "button";
+    editToggleBtn.className = "edit-toggle-btn";
+    editToggleBtn.innerHTML = EDIT_ICON;
+    editToggleBtn.addEventListener("click", () => setEditorHidden(!editorHidden));
+    updateEditToggleBtn();
+    toolbar.appendChild(editToggleBtn);
+
     const addSliceBtn = document.createElement("button");
     addSliceBtn.type = "button";
     addSliceBtn.className = "add-btn";
     addSliceBtn.textContent = "+ Add Slice";
     addSliceBtn.addEventListener("click", () => startAdd("slice", null, null));
     toolbar.appendChild(addSliceBtn);
-
-    // Maximize toggle, always available regardless of validation state.
-    maximizeBtn = document.createElement("button");
-    maximizeBtn.type = "button";
-    maximizeBtn.className = "preview-max-btn";
-    maximizeBtn.addEventListener("click", () => setMaximized(!maximized));
-    updateMaximizeBtn();
-    toolbar.appendChild(maximizeBtn);
 
     preview.appendChild(toolbar);
 
@@ -1746,7 +1777,7 @@
   }
 
   function sizeEditor() {
-    if (maximized) return; // editor is hidden; nothing to size
+    if (editorHidden) return; // editor is hidden; nothing to size
     const wrap = editor.parentElement; // .editor-wrap
     const wrapW = wrap.clientWidth;
     if (!wrapW) return;
@@ -1785,7 +1816,6 @@
     activeId = s.id;
     Sessions.setActiveId(s.id);
     input.value = s.content;
-    setMaximized(false); // fullscreen is transient — reset on session switch
     refreshSessionSelect();
     validate();
   }

@@ -10,7 +10,7 @@
 </head>
 <body>
   <header class="topbar">
-    <h1>JSON Editor</h1>
+    <h1>Event Modeling Tool</h1>
     <div class="actions">
       <div class="session-group">
         <select id="sessionSelect" title="Switch session" aria-label="Active session"></select>
@@ -18,10 +18,9 @@
         <button id="renameSessionBtn" type="button" title="Rename session">Rename</button>
         <button id="deleteSessionBtn" type="button" title="Delete session">Delete</button>
       </div>
-      <span class="schema-badge" title="Validating against the Event Modeling schema">Event Modeling schema</span>
       <button id="formatBtn" type="button" title="Pretty-print (Ctrl/Cmd+S)">Format</button>
       <button id="clearBtn" type="button">Clear</button>
-      <button id="downloadBtn" type="button" title="Download session as JSON">Download</button>
+      <button id="downloadBtn" type="button" title="Export session as JSON">Export</button>
       <button id="themeToggle" type="button" title="Theme" aria-label="Theme"></button>
     </div>
   </header>
@@ -35,6 +34,9 @@
           autocapitalize="off" wrap="off"
           placeholder="Paste or write JSON here&hellip;"></textarea>
       </div>
+    </div>
+    <div class="pane-rail" aria-hidden="false">
+      <button class="pane-toggle" id="paneToggle" type="button"></button>
     </div>
     <aside class="preview" id="preview" aria-label="Model preview"></aside>
   </main>
