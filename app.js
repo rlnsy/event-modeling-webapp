@@ -370,6 +370,8 @@
     if (type === "readmodel" && item && item.listElement) card.classList.add("is-list");
     // Mark traced consumers that have an information-completeness gap.
     if (item && item.id && completenessFlags.has(item.id)) card.classList.add("has-gap");
+    // Anchor for flow lines: lets the SVG overlay locate this card by element id.
+    if (item && item.id != null) card.dataset.elId = String(item.id);
     card.tabIndex = 0;
     card.setAttribute("role", "button");
     const t = document.createElement("div");
@@ -1041,6 +1043,7 @@
 
     const slices = parsed && Array.isArray(parsed.slices) ? parsed.slices : null;
     if (!slices || slices.length === 0) {
+      lastOrdered = null;
       const empty = document.createElement("div");
       empty.className = "preview-empty";
       empty.textContent = slices ? "No slices yet — add one to begin." : "Nothing to preview.";
@@ -1122,7 +1125,10 @@
       row.appendChild(col);
     });
 
+    lastOrdered = ordered;
     preview.appendChild(row);
+    if (flowObserver) { flowObserver.disconnect(); flowObserver.observe(row); }
+    drawFlowLines();
   }
 
   function setStatus(state, text, meta) {
@@ -1267,6 +1273,216 @@
     }
 
     return { inbound, outbound };
+  }
+
+  // ---------- Flow lines ----------
+  // Thin directional arrows between dependent elements, derived from each
+  // element's explicit `dependencies` (normalized to data-flow direction).
+  // Drawn as an SVG overlay over the preview row; see drawFlowLines.
+
+  const SVG_NS = "http://www.w3.org/2000/svg";
+
+  // Index every id-bearing element by id, plus the display position of the
+  // slice that owns it. `ordered` is orderedSlices()'s output, so positions
+  // already respect each slice's `index`.
+  function indexElements(ordered) {
+    const byId = new Map();     // id -> element
+    const slicePos = new Map(); // id -> display position of owning slice
+    ordered.forEach(({ s }, pos) => {
+      if (!s) return;
+      for (const key of ["commands", "events", "readmodels", "screens", "processors"]) {
+        for (const el of asArray(s[key])) {
+          if (el && el.id != null) { byId.set(el.id, el); slicePos.set(el.id, pos); }
+        }
+      }
+    });
+    return { byId, slicePos };
+  }
+
+  // Intra-slice lane flow (data-flow direction). These connections are inferred
+  // from the slice's *structure* — what elements sit in which lanes — because a
+  // model often expresses screen->command->event flow by layout rather than by
+  // declaring an explicit dependency on every hop. Read-model->event, by
+  // contrast, is always declared, so it stays explicit-only (see below).
+  const INTRA_FLOW = [
+    ["screens", "commands"], ["processors", "commands"],
+    ["commands", "events"], ["readmodels", "screens"],
+  ];
+
+  // Build the data-flow edges to draw, deduped (so an edge that is both implied
+  // by structure and declared explicitly draws once):
+  //   intra: screen->command, command->event, readmodel->screen  (same slice,
+  //          from the slice's lane structure)
+  //   cross: event->readmodel  (explicitly declared, event one slice to the
+  //          left of the read model)
+  function flowLineEdges(ordered) {
+    const { byId, slicePos } = indexElements(ordered);
+    const seen = new Set();
+    const edges = [];
+    const add = (from, to, kind) => {
+      if (!from || !to || from.id == null || to.id == null || from.id === to.id) return;
+      const k = from.id + ">" + to.id;
+      if (seen.has(k)) return;
+      seen.add(k);
+      edges.push({ fromId: from.id, toId: to.id, kind });
+    };
+
+    // Intra-slice arrows from lane structure.
+    ordered.forEach(({ s }) => {
+      if (!s) return;
+      for (const [fromKey, toKey] of INTRA_FLOW) {
+        for (const from of asArray(s[fromKey])) {
+          for (const to of asArray(s[toKey])) add(from, to, "intra");
+        }
+      }
+    });
+
+    // Cross-slice event->readmodel arrows from explicit dependencies, only when
+    // the event sits in the slice immediately to the left of the read model.
+    for (const el of byId.values()) {
+      for (const dep of asArray(el.dependencies)) {
+        if (!dep || dep.id == null) continue;
+        const other = byId.get(dep.id);
+        if (!other) continue;
+        // Normalize to data-flow direction: source feeds target.
+        let source, target;
+        if (dep.type === "OUTBOUND") { source = el; target = other; }
+        else if (dep.type === "INBOUND") { source = other; target = el; }
+        else continue;
+        if (source.type === "EVENT" && target.type === "READMODEL" &&
+            slicePos.get(source.id) === slicePos.get(target.id) - 1) {
+          add(source, target, "cross");
+        }
+      }
+    }
+    return edges;
+  }
+
+  // The slice ordering from the most recent renderModel, so redraws (observer /
+  // resize) can rebuild the overlay without re-parsing. null when nothing is
+  // rendered (empty/invalid document).
+  let lastOrdered = null;
+
+  // Redraws the overlay when the row's size changes (field toggles, lazy image
+  // loads). Created at init, retargeted at the end of each renderModel.
+  let flowObserver = null;
+
+  // Escape an id for use in a CSS attribute selector.
+  function cssEscape(s) {
+    if (window.CSS && CSS.escape) return CSS.escape(String(s));
+    return String(s).replace(/["\\\]]/g, "\\$&");
+  }
+
+  // Each *Path returns { d, tip, dir }: the SVG path data, the consumer-end point
+  // the arrowhead sits at, and the unit vector of the line's tangent there. The
+  // arrowhead is drawn explicitly from `dir` (not an SVG marker), so it always
+  // lines up with the curve regardless of browser marker-orient behavior. Boxes
+  // are { x, y, w, h, cx, cy } in the row's content coordinate space.
+
+  // Intra-slice edge: two cards stacked in the same column a short gap apart.
+  // The line bows out to the left (into the gutter, against the empty background
+  // where a thin line reads clearly) and then comes straight back in along the
+  // vertical — entering the target's top/bottom edge dead vertical, so the
+  // arrowhead points straight down (or up) and lines up with the approach.
+  // A clean straight vertical connector between two cards stacked in the same
+  // column: source edge center to target edge center. Spans exactly the gap
+  // between them, so it never overshoots into either card.
+  function intraPath(a, b) {
+    const down = b.cy >= a.cy; // target below source
+    const p = { x: a.cx, y: down ? a.y + a.h : a.y };
+    const q = { x: b.cx, y: down ? b.y : b.y + b.h };
+    const d = "M" + p.x + "," + p.y + " L" + q.x + "," + q.y;
+    return { d, tip: q, dir: { x: 0, y: down ? 1 : -1 } };
+  }
+
+  // Cross-slice event -> read-model edge. Always enters the bottom of the read
+  // model on a dead-vertical final segment, so the upward arrowhead is guaranteed
+  // to line up. The shape depends on the event's position relative to the read
+  // model:
+  //   - event at/above the read model: a straight-sided U out of the event's
+  //     bottom, down to a baseline below both cards, and straight up.
+  //   - event clearly below the read model (the usual case — events sit a lane
+  //     lower): a right-angle corner — straight out of the event's right side,
+  //     then 90° straight up into the read model. Only used when the event sits
+  //     far enough below for a clean rise; when they're near the same level the
+  //     corner would be mashed, so it falls back to the U.
+  const CROSS_DIP = 40;      // px the U's baseline sits below the lower card
+  const CROSS_MIN_RISE = 28; // min vertical room below the read model for a corner
+  function crossPath(a, b) {
+    const q = { x: b.cx, y: b.y + b.h }; // enter read model from below, head up
+    let d;
+    if (a.cy - q.y >= CROSS_MIN_RISE) {
+      const p = { x: a.x + a.w, y: a.cy }; // exit the event's right side
+      d = "M" + p.x + "," + p.y +
+        " L" + q.x + "," + p.y +
+        " L" + q.x + "," + q.y;
+    } else {
+      const p = { x: a.cx, y: a.y + a.h }; // exit the event's bottom
+      const baseY = Math.max(a.y + a.h, b.y + b.h) + CROSS_DIP;
+      d = "M" + p.x + "," + p.y +
+        " L" + p.x + "," + baseY +
+        " L" + q.x + "," + baseY +
+        " L" + q.x + "," + q.y;
+    }
+    return { d, tip: q, dir: { x: 0, y: -1 } };
+  }
+
+  // Draw a small filled triangle arrowhead at `tip`, pointing along unit `dir`.
+  const HEAD_LEN = 10, HEAD_HALF = 3.5;
+  function drawArrowHead(svg, tip, dir) {
+    const bx = tip.x - dir.x * HEAD_LEN, by = tip.y - dir.y * HEAD_LEN;
+    const px = -dir.y, py = dir.x; // unit perpendicular
+    const poly = document.createElementNS(SVG_NS, "polygon");
+    poly.setAttribute("points",
+      tip.x + "," + tip.y + " " +
+      (bx + px * HEAD_HALF) + "," + (by + py * HEAD_HALF) + " " +
+      (bx - px * HEAD_HALF) + "," + (by - py * HEAD_HALF));
+    poly.setAttribute("class", "flow-arrowhead");
+    svg.appendChild(poly);
+  }
+
+  // (Re)build the flow-line overlay over the current preview row. Safe to call
+  // repeatedly; removes any prior overlay first. No-op when nothing is rendered.
+  function drawFlowLines() {
+    const row = preview.querySelector(".preview-row");
+    if (!row || !lastOrdered) return;
+    const prior = row.querySelector("svg.flow-lines");
+    if (prior) prior.remove();
+
+    const edges = flowLineEdges(lastOrdered);
+    if (edges.length === 0) return;
+
+    const rowRect = row.getBoundingClientRect();
+    const W = row.scrollWidth, H = row.scrollHeight;
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", "flow-lines");
+    svg.setAttribute("width", W);
+    svg.setAttribute("height", H);
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+    // A card's box in the row's content coordinate space. The row is not the
+    // scrolling element (#preview is), so subtracting rowRect already accounts
+    // for scroll — both rects move together.
+    const boxOf = (id) => {
+      const card = preview.querySelector('[data-el-id="' + cssEscape(id) + '"]');
+      if (!card) return null;
+      const r = card.getBoundingClientRect();
+      const x = r.left - rowRect.left, y = r.top - rowRect.top;
+      return { x, y, w: r.width, h: r.height, cx: x + r.width / 2, cy: y + r.height / 2 };
+    };
+
+    for (const { fromId, toId, kind } of edges) {
+      const a = boxOf(fromId), b = boxOf(toId);
+      if (!a || !b) continue;
+      const shape = kind === "cross" ? crossPath(a, b) : intraPath(a, b);
+      const path = document.createElementNS(SVG_NS, "path");
+      path.setAttribute("class", "flow-line");
+      path.setAttribute("d", shape.d);
+      svg.appendChild(path);
+      drawArrowHead(svg, shape.tip, shape.dir);
+    }
+
+    row.appendChild(svg);
   }
 
   // True when `el` feeds at least one element of the given element `type`.
@@ -1624,6 +1840,14 @@
 
   // Refit on viewport changes (the min/max clamps are relative to the wrap width).
   window.addEventListener("resize", sizeEditor);
+
+  // Flow-line overlay redraws: when card sizes change (field toggles, lazy image
+  // loads) and on window resize. The overlay is absolute + pointer-events:none,
+  // so it never feeds back into the observed layout.
+  if (window.ResizeObserver) {
+    flowObserver = new ResizeObserver(() => drawFlowLines());
+  }
+  window.addEventListener("resize", drawFlowLines);
   input.addEventListener("scroll", syncScroll);
 
   // Tab inserts two spaces instead of moving focus.

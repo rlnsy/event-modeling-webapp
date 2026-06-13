@@ -260,6 +260,27 @@ button:disabled:hover {
   gap: 14px;
   align-items: flex-start;
   min-width: min-content;
+  position: relative;
+}
+
+/* Flow lines: an SVG overlay drawn over the slice row. Absolute + non-
+   interactive so cards stay clickable; thin and faint so structure reads first. */
+svg.flow-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+.flow-line {
+  fill: none;
+  stroke: var(--fg-faint);
+  stroke-width: 1.5;
+  opacity: 0.75;
+}
+.flow-arrowhead {
+  fill: var(--fg-faint);
 }
 
 .preview-empty {
@@ -273,7 +294,9 @@ button:disabled:hover {
   width: 200px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  /* Roomy gap between lanes so the flow-line arcs + arrowheads connecting
+     stacked elements (screen->command->event) have space to read clearly. */
+  gap: 46px;
 }
 
 .slice-header {
