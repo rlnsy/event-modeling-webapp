@@ -349,6 +349,16 @@
     return ul;
   }
 
+  // Emoji prefixed to a card's title to signal its element type at a glance.
+  // Types not listed here (actor, screen, table, …) render their title plain.
+  const TYPE_ICONS = {
+    readmodel: "👁️",
+    event: "💾",
+    command: "📣",
+    automation: "⚙️", // slice.processors render as the "automation" card type
+    specification: "ℹ️",
+  };
+
   // Wrap a fully-built card so clicking (or Enter/Space) opens the detail modal.
   // `ctx` (when present) locates the item in the model so the detail modal can
   // offer Edit/Delete.
@@ -364,7 +374,9 @@
     card.setAttribute("role", "button");
     const t = document.createElement("div");
     t.className = "card-title";
-    t.textContent = title != null && title !== "" ? String(title) : "(untitled)";
+    const titleText = title != null && title !== "" ? String(title) : "(untitled)";
+    const icon = TYPE_ICONS[type];
+    t.textContent = icon ? icon + " " + titleText : titleText;
     card.appendChild(t);
     if (body) card.appendChild(body);
     const open = () => openDetail(type, item, ctx);

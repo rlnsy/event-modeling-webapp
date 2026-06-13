@@ -389,17 +389,6 @@ button:disabled:hover {
 }
 .card .spec-group .card-fields { margin: 1px 0 2px 8px; }
 
-/* Per-type accent colors on the left border. */
-.card.type-actor        { border-left-color: var(--fg-faint); }
-.card.type-screen       { border-left-color: var(--fg-dim); }
-.card.type-screenimage  { border-left-color: var(--teal); }
-.card.type-command      { border-left-color: var(--accent); }
-.card.type-readmodel    { border-left-color: var(--ok); }
-.card.type-automation   { border-left-color: var(--automation); }
-.card.type-event        { border-left-color: var(--event); }
-.card.type-specification{ border-left-color: var(--ok); }
-.card.type-table        { border-left-color: var(--fg-faint); }
-
 /* A list read model gets a small "list" badge pinned to the card's top-right
    corner to mark it as a collection of records rather than a single one. */
 .card.type-readmodel.is-list { position: relative; }
