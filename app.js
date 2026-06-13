@@ -333,9 +333,9 @@
   }
 
   // When `redundant` (a Set of field signatures) is supplied, any field whose
-  // signature is in it is marked `.f-redundant` so CSS can hide it until the
-  // card is hovered — used by commands to suppress fields they merely echo from
-  // their produced events.
+  // signature is in it is marked `.f-redundant` so CSS can hide it — used by
+  // events to suppress fields identical to ones already shown on the slice's
+  // commands.
   function fieldList(fields, redundant) {
     const ul = document.createElement("ul");
     ul.className = "card-fields";
@@ -799,13 +799,13 @@
     return fieldsFromElements(slice && slice.events);
   }
 
-  // Signatures (name + type) of every field across the slice's produced events.
-  // A command field whose signature is in here merely echoes an event field, so
-  // it's hidden on the command card until hover (see fieldList's `redundant`).
-  function producedEventSigs(slice) {
+  // Signatures (name + type) of every field across the slice's commands. An
+  // event field whose signature is in here merely echoes a command field, so
+  // it's hidden on the event card (see fieldList's `redundant`).
+  function commandFieldSigs(slice) {
     const set = new Set();
-    for (const ev of asArray(slice && slice.events)) {
-      for (const f of asArray(ev && ev.fields)) {
+    for (const cmd of asArray(slice && slice.commands)) {
+      for (const f of asArray(cmd && cmd.fields)) {
         if (f && typeof f === "object" && f.name != null) set.add(fieldSig(f));
       }
     }
@@ -1107,8 +1107,8 @@
         } else {
           for (const key of laneDef.keys) {
             const type = (laneDef.typeFor && laneDef.typeFor[key]) || laneDef.type;
-            // Commands hide fields they merely echo from the slice's events.
-            const opts = type === "command" ? { redundant: producedEventSigs(slice) } : null;
+            // Events hide fields identical to ones already on the slice's commands.
+            const opts = type === "event" ? { redundant: commandFieldSigs(slice) } : null;
             asArray(slice[key]).forEach((item, idx) => {
               lane.appendChild(cardFor(type, item, makeCtx(slice.id, i, key, item, idx), opts));
               count++;
