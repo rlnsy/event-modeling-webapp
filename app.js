@@ -326,10 +326,26 @@
     return li;
   }
 
-  function fieldList(fields) {
+  // A field's identity for redundancy matching: name + type. Two fields with the
+  // same name and type are considered the same field.
+  function fieldSig(f) {
+    return String(f.name) + " " + (f.type != null ? String(f.type) : "");
+  }
+
+  // When `redundant` (a Set of field signatures) is supplied, any field whose
+  // signature is in it is marked `.f-redundant` so CSS can hide it until the
+  // card is hovered — used by commands to suppress fields they merely echo from
+  // their produced events.
+  function fieldList(fields, redundant) {
     const ul = document.createElement("ul");
     ul.className = "card-fields";
-    for (const f of asArray(fields)) ul.appendChild(fieldLine(f));
+    for (const f of asArray(fields)) {
+      const li = fieldLine(f);
+      if (redundant && f && typeof f === "object" && f.name != null && redundant.has(fieldSig(f))) {
+        li.classList.add("f-redundant");
+      }
+      ul.appendChild(li);
+    }
     return ul;
   }
 
@@ -407,7 +423,7 @@
     return img;
   }
 
-  function cardFor(type, item, ctx) {
+  function cardFor(type, item, ctx, opts) {
     if (type === "actor") {
       return makeCard("actor", item && item.name, null, item, !!(item && item.authRequired), ctx);
     }
@@ -417,7 +433,13 @@
     if (type === "specification") {
       return makeCard("specification", item && item.title, item ? specBody(item) : null, item, false, ctx);
     }
-    return makeCard(type, item && item.title, item ? fieldList(item.fields) : null, item, false, ctx);
+    // Top-level elements (processors/automations) omit their fields in the main
+    // visualizer to save vertical space; the full field list still appears in
+    // the detail modal and feeds the information-completeness check.
+    const body = item && type !== "automation"
+      ? fieldList(item.fields, opts && opts.redundant)
+      : null;
+    return makeCard(type, item && item.title, body, item, false, ctx);
   }
 
   // An image embedded inside a screen card. Clicking it opens the image's own
@@ -437,16 +459,22 @@
     return wrap;
   }
 
-  // A screen card: title, fields, then any slice screen images beneath them.
+  // A screen card: a top-level element, so its fields are omitted from the main
+  // visualizer (they remain in the detail modal and feed the IC check); just the
+  // slice screen images render here. When a screen has at least one image, its
+  // title is dropped too — the image speaks for it.
   // `ctx` locates the screen; embedded images get their own screenImages ctx.
   function screenCard(screen, images, ctx) {
+    const imgs = asArray(images);
     const body = document.createDocumentFragment();
-    body.appendChild(fieldList(asArray(screen && screen.fields)));
-    asArray(images).forEach((im, idx) => {
+    imgs.forEach((im, idx) => {
       const imCtx = ctx ? makeCtx(ctx.sliceId, ctx.sliceIdx, "screenImages", im, idx) : null;
       body.appendChild(embeddedImage(im, imCtx));
     });
-    return makeCard("screen", screen && screen.title, body, screen, false, ctx);
+    const title = imgs.length ? "" : (screen && screen.title);
+    const card = makeCard("screen", title, body, screen, false, ctx);
+    if (imgs.length) card.classList.add("no-title");
+    return card;
   }
 
   // ---------- Detail modal ----------
@@ -759,6 +787,19 @@
     return fieldsFromElements(slice && slice.events);
   }
 
+  // Signatures (name + type) of every field across the slice's produced events.
+  // A command field whose signature is in here merely echoes an event field, so
+  // it's hidden on the command card until hover (see fieldList's `redundant`).
+  function producedEventSigs(slice) {
+    const set = new Set();
+    for (const ev of asArray(slice && slice.events)) {
+      for (const f of asArray(ev && ev.fields)) {
+        if (f && typeof f === "object" && f.name != null) set.add(fieldSig(f));
+      }
+    }
+    return set;
+  }
+
   // Every event across the whole model, in slice/array order. Read models pick
   // their dependencies from this list, so a read model can depend on events
   // outside its own slice.
@@ -1054,8 +1095,10 @@
         } else {
           for (const key of laneDef.keys) {
             const type = (laneDef.typeFor && laneDef.typeFor[key]) || laneDef.type;
+            // Commands hide fields they merely echo from the slice's events.
+            const opts = type === "command" ? { redundant: producedEventSigs(slice) } : null;
             asArray(slice[key]).forEach((item, idx) => {
-              lane.appendChild(cardFor(type, item, makeCtx(slice.id, i, key, item, idx)));
+              lane.appendChild(cardFor(type, item, makeCtx(slice.id, i, key, item, idx), opts));
               count++;
             });
           }

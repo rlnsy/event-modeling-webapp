@@ -363,6 +363,13 @@ button:disabled:hover {
   border-left: 1px solid var(--line);
 }
 .card .card-fields li.has-sub.collapsed > .card-subfields { display: none; }
+/* Command fields that merely echo a produced event are hidden to save space,
+   then revealed when the card is hovered. */
+.card .card-fields li.f-redundant { display: none; }
+.card:hover .card-fields li.f-redundant { display: flex; }
+.card:hover .card-fields li.f-redundant.has-sub { display: block; }
+/* A screen card carrying an image suppresses its title — the image stands in. */
+.card.type-screen.no-title .card-title { display: none; }
 .card .spec-group {
   margin-top: 4px;
   font-size: 11px;
