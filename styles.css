@@ -341,7 +341,6 @@ svg.flow-lines {
 .card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-left: 3px solid var(--fg-faint);
   border-radius: 5px;
   padding: 6px 8px;
   cursor: pointer;
