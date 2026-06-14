@@ -348,6 +348,27 @@ svg.flow-lines {
 }
 .card:hover { background: var(--card-hover); }
 .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Element-type color coding (event-modeling convention): commands blue,
+   events orange, read models green. A tinted background + matching border keeps
+   the card legible in both themes while signaling its type at a glance. */
+.card.type-command {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+}
+.card.type-command:hover { background: color-mix(in srgb, var(--accent) 15%, var(--panel)); }
+
+.card.type-event {
+  border-color: color-mix(in srgb, var(--event) 55%, var(--line));
+  background: color-mix(in srgb, var(--event) 9%, var(--panel));
+}
+.card.type-event:hover { background: color-mix(in srgb, var(--event) 16%, var(--panel)); }
+
+.card.type-readmodel {
+  border-color: color-mix(in srgb, var(--ok) 55%, var(--line));
+  background: color-mix(in srgb, var(--ok) 8%, var(--panel));
+}
+.card.type-readmodel:hover { background: color-mix(in srgb, var(--ok) 15%, var(--panel)); }
 .card .card-title {
   font-size: 12.5px;
   font-weight: 600;
