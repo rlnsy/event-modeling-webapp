@@ -3,54 +3,54 @@
     Consolas, monospace;
 }
 
-/* Catppuccin Mocha. */
+/* Neutral dark — near-black greys with a single blue accent, macOS-style. */
 [data-theme="dark"] {
-  --bg: #1e1e2e;
-  --bg-elev: #181825;
-  --panel: #11111b;
-  --fg: #cdd6f4;
-  --fg-dim: #a6adc8;
-  --fg-faint: #6c7086;
-  --line: #313244;
-  --accent: #89b4fa;
-  --accent-hover: #a6c8ff;
-  --ok: #a6e3a1;
-  --warn: #f9e2af;
-  --err: #f38ba8;
-  --err-bg: rgba(243, 139, 168, 0.14);
-  --event: #fab387;
-  --automation: #cba6f7;
-  --teal: #94e2d5;
-  --btn-hover: #45475a;
-  --btn-active: #585b70;
-  --card-hover: #1c1c2a;
-  --shadow: rgba(0, 0, 0, 0.4);
-  --shadow-strong: rgba(0, 0, 0, 0.5);
+  --bg: #1f1f21;
+  --bg-elev: #171718;
+  --panel: #121213;
+  --fg: #ededee;
+  --fg-dim: #9b9b9f;
+  --fg-faint: #656569;
+  --line: #2f2f32;
+  --accent: #4ea1ff;
+  --accent-hover: #6cb2ff;
+  --ok: #43b97a;
+  --warn: #cfa14a;
+  --err: #ec6a5e;
+  --err-bg: rgba(236, 106, 94, 0.13);
+  --event: #d28c5f;
+  --automation: #9a8cce;
+  --teal: #5cb6aa;
+  --btn-hover: #2c2c2f;
+  --btn-active: #3a3a3e;
+  --card-hover: #1a1a1c;
+  --shadow: rgba(0, 0, 0, 0.45);
+  --shadow-strong: rgba(0, 0, 0, 0.6);
 }
 
-/* Catppuccin Latte. */
+/* Neutral light — white canvas, light-grey chrome, single blue accent. */
 [data-theme="light"] {
-  --bg: #eff1f5;
-  --bg-elev: #e6e9ef;
-  --panel: #dce0e8;
-  --fg: #4c4f69;
-  --fg-dim: #6c6f85;
-  --fg-faint: #9ca0b0;
-  --line: #ccd0da;
-  --accent: #1e66f5;
-  --accent-hover: #0b56e0;
-  --ok: #40a02b;
-  --warn: #df8e1d;
-  --err: #d20f39;
-  --err-bg: rgba(210, 15, 57, 0.1);
-  --event: #fe640b;
-  --automation: #8839ef;
-  --teal: #179299;
-  --btn-hover: #bcc0cc;
-  --btn-active: #acb0be;
-  --card-hover: #d2d6e0;
-  --shadow: rgba(0, 0, 0, 0.12);
-  --shadow-strong: rgba(0, 0, 0, 0.18);
+  --bg: #ffffff;
+  --bg-elev: #f5f5f6;
+  --panel: #fbfbfc;
+  --fg: #1d1d1f;
+  --fg-dim: #6b6b70;
+  --fg-faint: #a0a0a5;
+  --line: #e3e3e6;
+  --accent: #007aff;
+  --accent-hover: #0064d6;
+  --ok: #2f9e4f;
+  --warn: #b8852b;
+  --err: #df453a;
+  --err-bg: rgba(223, 69, 58, 0.08);
+  --event: #cf7a3c;
+  --automation: #836fc4;
+  --teal: #2a978f;
+  --btn-hover: #d9d9dd;
+  --btn-active: #cccccf;
+  --card-hover: #f1f1f3;
+  --shadow: rgba(0, 0, 0, 0.08);
+  --shadow-strong: rgba(0, 0, 0, 0.14);
 }
 
 * { box-sizing: border-box; }
@@ -174,8 +174,8 @@ button:disabled:hover {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 .pane-toggle:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--fg);
+  border-color: var(--fg-faint);
 }
 .pane-toggle svg { display: block; width: 14px; height: 14px; }
 /* Editor hidden: the divider sits at the window's left edge, so nudge the handle
@@ -645,19 +645,19 @@ svg.flow-lines {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--line);
+  color: var(--fg);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 5px 7px;
   line-height: 0;
   cursor: pointer;
 }
-.edit-toggle-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.edit-toggle-btn:hover { background: var(--btn-hover); }
 .edit-toggle-btn.active {
-  background: var(--accent);
-  color: var(--bg-elev);
-  border-color: var(--accent);
+  background: var(--btn-active);
+  color: var(--fg);
+  border-color: transparent;
 }
 .edit-toggle-btn svg { width: 15px; height: 15px; }
 
@@ -677,9 +677,9 @@ body.editor-hidden .preview-empty {
 
 /* Shared look for the "+ Add Slice" button and the per-slice "+ Add" summary. */
 .add-btn {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--line);
+  color: var(--fg);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 4px 9px;
   font-size: 12px;
@@ -687,7 +687,7 @@ body.editor-hidden .preview-empty {
   cursor: pointer;
   list-style: none;
 }
-.add-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.add-btn:hover { background: var(--btn-hover); }
 summary.add-btn { user-select: none; }
 summary.add-btn::-webkit-details-marker { display: none; }
 summary.add-btn::marker { content: ""; }
@@ -714,16 +714,16 @@ summary.add-btn::marker { content: ""; }
 /* ◀ / ▶ slice reorder buttons. */
 .slice-reorder { display: flex; gap: 4px; }
 .reorder-btn {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--line);
+  color: var(--fg);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 4px 7px;
   font-size: 11px;
   line-height: 1;
   cursor: pointer;
 }
-.reorder-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.reorder-btn:hover:not(:disabled) { background: var(--btn-hover); }
 .reorder-btn:disabled { opacity: 0.35; cursor: default; }
 
 .add-menu { position: relative; flex: 0 0 auto; }
@@ -805,12 +805,12 @@ input[type="checkbox"].form-input {
   margin-right: auto;
 }
 .btn-primary {
-  background: var(--accent);
-  color: var(--bg);
+  background: var(--btn-active);
+  color: var(--fg);
   font-weight: 600;
   border: 0;
 }
-.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:hover { background: var(--btn-hover); }
 .btn-secondary { background: var(--line); }
 .btn-danger {
   background: color-mix(in srgb, var(--err) 14%, transparent);
@@ -826,9 +826,9 @@ input[type="checkbox"].form-input {
 /* ✎ / 🗑 slice edit + delete buttons in the slice header. */
 .slice-edit-controls { display: flex; gap: 4px; }
 .slice-edit-btn {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: var(--line);
+  color: var(--fg);
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 4px 7px;
   font-size: 11px;
@@ -837,7 +837,7 @@ input[type="checkbox"].form-input {
 }
 .slice-edit-btn { display: inline-flex; align-items: center; justify-content: center; }
 .slice-edit-btn .icon-trash { display: block; }
-.slice-edit-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.slice-edit-btn:hover { background: var(--btn-hover); }
 .slice-edit-btn.slice-del-btn {
   background: color-mix(in srgb, var(--err) 12%, transparent);
   color: var(--err);
@@ -898,15 +898,15 @@ input[type="checkbox"].form-input {
 }
 .add-field-btn {
   align-self: flex-start;
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--accent);
-  border: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent);
+  background: transparent;
+  color: var(--fg-dim);
+  border: 1px dashed var(--line);
   border-radius: 6px;
   padding: 5px 10px;
   font-size: 12px;
   font-weight: 600;
 }
-.add-field-btn:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.add-field-btn:hover { background: var(--btn-hover); color: var(--fg); }
 
 /* Nested object editing: a field item stacks its input row over an indented,
    collapsible subfield area, shown only for Custom-typed fields. */
@@ -982,4 +982,4 @@ input[type="checkbox"].form-input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.dep-option:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.dep-option:hover { background: var(--btn-hover); }
