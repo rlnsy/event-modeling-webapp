@@ -492,8 +492,14 @@
   }
 
   // ---------- Detail modal ----------
+  // Identifiers used purely to wire nodes together — element ids, id-based
+  // references, and the trigger lists that point at command ids. They're
+  // plumbing, not domain content, so we keep them out of the detail view.
+  const LINK_ID_KEYS = new Set(["id", "linkedId", "triggers"]);
+
   // Recursively render any JSON value as a readable tree so the modal shows
-  // *every* property of an element, with nothing hand-picked or dropped.
+  // every meaningful property of an element. Node-linking ids (see
+  // LINK_ID_KEYS) are skipped so the model reads in domain terms.
   function renderValue(value) {
     if (value === null || value === undefined) {
       const s = document.createElement("span");
@@ -527,6 +533,7 @@
     const obj = document.createElement("div");
     obj.className = "detail-object";
     for (const key of Object.keys(value)) {
+      if (LINK_ID_KEYS.has(key)) continue;
       const row = document.createElement("div");
       row.className = "detail-row";
       const k = document.createElement("span");
@@ -547,7 +554,7 @@
 
   function openDetail(type, item, ctx) {
     detailCtx = ctx || null;
-    const name = item && (item.title || item.name || item.id);
+    const name = item && (item.title || item.name);
     modalTitle.textContent = (name ? String(name) : "(untitled)") +
       "  ·  " + (TYPE_LABELS[type] || type);
     modalBody.innerHTML = "";
@@ -948,7 +955,7 @@
       return;
     }
     const item = arr[idx];
-    const name = (item && (item.title || item.name || item.id)) || "this item";
+    const name = (item && (item.title || item.name)) || "this item";
     if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
     arr.splice(idx, 1);
     commitModel(model);
