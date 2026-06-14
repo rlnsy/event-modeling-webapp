@@ -416,7 +416,7 @@
 
   // A screen-image card: a thumbnail of the `url`, degrading to a note if the
   // image is missing or fails to load.
-  function screenImageBody(item) {
+  function screenImageBody(item, className) {
     if (!item || !item.url) {
       const note = document.createElement("div");
       note.className = "img-missing";
@@ -424,7 +424,7 @@
       return note;
     }
     const img = document.createElement("img");
-    img.className = "screen-img";
+    img.className = className || "screen-img";
     img.src = String(item.url);
     img.alt = item.title != null ? String(item.title) : "screen image";
     img.loading = "lazy";
@@ -456,38 +456,34 @@
     return makeCard(type, item && item.title, body, item, false, ctx);
   }
 
-  // An image embedded inside a screen card. Clicking it opens the image's own
-  // detail (it's slice-level data, not part of the screen element), so we stop
-  // the click from bubbling up to the screen card's handler.
-  function embeddedImage(im, ctx) {
+  // An image embedded inside a screen card. The screen and its image are one
+  // concept, so the click isn't handled here — it bubbles up to the screen
+  // card's handler, which opens the screen detail (where the image can be viewed
+  // larger and its URL edited).
+  function embeddedImage(im) {
     const wrap = document.createElement("div");
     wrap.className = "screen-img-wrap";
-    wrap.tabIndex = 0;
-    wrap.setAttribute("role", "button");
     wrap.appendChild(screenImageBody(im));
-    const open = (e) => { e.stopPropagation(); openDetail("screenimage", im, ctx); };
-    wrap.addEventListener("click", open);
-    wrap.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(e); }
-    });
     return wrap;
   }
 
   // A screen card: a top-level element, so its fields are omitted from the main
   // visualizer (they remain in the detail modal and feed the IC check); just the
-  // slice screen images render here. When a screen has at least one image, its
-  // title is dropped too — the image speaks for it.
-  // `ctx` locates the screen; embedded images get their own screenImages ctx.
+  // slice screen images render here. When a screen has image(s) but no
+  // description, the screen and its image are one and the same — so the card's
+  // own title and chrome drop away and only the image shows (clicking it still
+  // opens the screen). A described screen keeps its card, with the image inside.
+  // `ctx` locates the screen; clicking the card (or its image) opens it.
   function screenCard(screen, images, ctx) {
     const imgs = asArray(images);
+    const collapse = imgs.length && !(screen && screen.description);
     const body = document.createDocumentFragment();
-    imgs.forEach((im, idx) => {
-      const imCtx = ctx ? makeCtx(ctx.sliceId, ctx.sliceIdx, "screenImages", im, idx) : null;
-      body.appendChild(embeddedImage(im, imCtx));
+    imgs.forEach((im) => {
+      body.appendChild(embeddedImage(im));
     });
-    const title = imgs.length ? "" : (screen && screen.title);
+    const title = collapse ? "" : (screen && screen.title);
     const card = makeCard("screen", title, body, screen, false, ctx);
-    if (imgs.length) card.classList.add("no-title");
+    if (collapse) card.classList.add("no-title");
     return card;
   }
 
@@ -552,12 +548,56 @@
   // buttons know what to act on. Cleared when the modal opens without context.
   let detailCtx = null;
 
+  // The image section shown atop a screen's detail modal: each of the slice's
+  // screen images rendered large enough to read, each with an Edit button, plus
+  // an "+ Add image" button. Screen and image are one concept, so this is where
+  // a screen's image URL is managed. Returns null when there's nothing to show
+  // and no slice context to add into.
+  function screenImagesSection(ctx) {
+    if (!ctx) return null;
+    const model = modelForEditing();
+    const slice = model && findSlice(model, ctx.sliceId, ctx.sliceIdx);
+    if (!slice) return null;
+    const images = asArray(slice.screenImages);
+
+    const section = document.createElement("div");
+    section.className = "modal-screen-images";
+    images.forEach((im, idx) => {
+      const fig = document.createElement("div");
+      fig.className = "modal-screen-image";
+      fig.appendChild(screenImageBody(im, "modal-screen-img"));
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "btn-secondary modal-img-edit";
+      editBtn.textContent = im && im.url ? "Edit image" : "Edit image URL";
+      editBtn.addEventListener("click", () =>
+        editComponent(makeCtx(ctx.sliceId, ctx.sliceIdx, "screenImages", im, idx)));
+      fig.appendChild(editBtn);
+      section.appendChild(fig);
+    });
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.className = "btn-secondary modal-img-add";
+    addBtn.textContent = "+ Add image";
+    addBtn.addEventListener("click", () => {
+      closeDetail();
+      startAdd("screenImage", ctx.sliceId, ctx.sliceIdx);
+    });
+    section.appendChild(addBtn);
+    return section;
+  }
+
   function openDetail(type, item, ctx) {
     detailCtx = ctx || null;
     const name = item && (item.title || item.name);
     modalTitle.textContent = (name ? String(name) : "(untitled)") +
       "  ·  " + (TYPE_LABELS[type] || type);
     modalBody.innerHTML = "";
+    if (type === "screen") {
+      const imgs = screenImagesSection(detailCtx);
+      if (imgs) modalBody.appendChild(imgs);
+    }
     modalBody.appendChild(renderValue(item == null ? {} : item));
     if (modalFoot) modalFoot.hidden = !detailCtx;
     modalBackdrop.hidden = false;
@@ -964,10 +1004,12 @@
 
   // A per-slice "+ Add" disclosure menu listing every addable element type.
   // Uses a native <details> so no global open/close state is needed.
+  // "Screen Image" is intentionally absent: a screen and its image are one
+  // concept, so images are added/edited from within the screen detail modal.
   const SLICE_ADD_ITEMS = [
     ["command", "Command"], ["event", "Event"], ["readmodel", "Read Model"],
     ["screen", "Screen"], ["processor", "Processor"], ["actor", "Actor"],
-    ["screenImage", "Screen Image"], ["table", "Table"], ["specification", "Specification"],
+    ["table", "Table"], ["specification", "Specification"],
   ];
 
   function sliceAddMenu(sliceId, sliceIdx) {

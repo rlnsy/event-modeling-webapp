@@ -426,8 +426,18 @@ svg.flow-lines {
 /* Event fields identical to ones already on the slice's command are hidden to
    save space; fields unique to the event still show. */
 .card .card-fields li.f-redundant { display: none; }
-/* A screen card carrying an image suppresses its title — the image stands in. */
+/* A screen carrying image(s) but no description is one and the same as its
+   image: the wrapping card sheds its title and chrome so only the image shows
+   (it still anchors flow lines and opens the screen on click). */
+.card.type-screen.no-title {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.card.type-screen.no-title:hover { background: none; }
 .card.type-screen.no-title .card-title { display: none; }
+.card.type-screen.no-title .screen-img { margin-top: 0; }
 .card .spec-group {
   margin-top: 4px;
   font-size: 11px;
@@ -501,6 +511,27 @@ svg.flow-lines {
   font-style: italic;
   font-size: 11px;
 }
+
+/* Screen detail modal: the screen's image(s) shown large with per-image edit
+   controls and an add button. Screen and image are one concept here. */
+.modal-screen-images {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.modal-screen-image { display: flex; flex-direction: column; gap: 6px; }
+.modal-screen-img {
+  display: block;
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+}
+.modal-img-edit { align-self: flex-start; }
+.modal-img-add { align-self: flex-start; }
 
 .card.type-actor .card-title::before {
   content: "\1F464  ";
