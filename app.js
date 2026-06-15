@@ -1157,10 +1157,12 @@
       title.className = "slice-title";
       title.textContent = slice.title != null && slice.title !== "" ? String(slice.title) : "(untitled slice)";
       headMain.appendChild(title);
-      const meta = document.createElement("div");
-      meta.className = "slice-meta";
-      meta.textContent = [slice.sliceType, slice.status].filter(Boolean).join(" · ");
-      if (meta.textContent) headMain.appendChild(meta);
+      if (slice.status) {
+        const status = document.createElement("span");
+        status.className = "slice-status";
+        status.textContent = String(slice.status);
+        headMain.appendChild(status);
+      }
       header.appendChild(headMain);
       const headActions = document.createElement("div");
       headActions.className = "slice-head-actions";
