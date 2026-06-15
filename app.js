@@ -362,6 +362,22 @@
     specification: "ℹ️",
   };
 
+  function descriptionText(item) {
+    if (!item || item.description == null) return null;
+    const text = String(item.description).trim();
+    if (!text) return null;
+    return text;
+  }
+
+  function descriptionEl(item) {
+    const text = descriptionText(item);
+    if (!text) return null;
+    const desc = document.createElement("div");
+    desc.className = "card-description";
+    desc.textContent = text;
+    return desc;
+  }
+
   // Wrap a fully-built card so clicking (or Enter/Space) opens the detail modal.
   // `ctx` (when present) locates the item in the model so the detail modal can
   // offer Edit/Delete.
@@ -383,6 +399,8 @@
     const icon = TYPE_ICONS[type];
     t.textContent = icon ? icon + " " + titleText : titleText;
     card.appendChild(t);
+    const desc = descriptionEl(item);
+    if (desc) card.appendChild(desc);
     if (body) card.appendChild(body);
     const open = () => openDetail(type, item, ctx);
     card.addEventListener("click", open);
@@ -496,6 +514,13 @@
   // plumbing, not domain content, so we keep them out of the detail view.
   const LINK_ID_KEYS = new Set(["id", "linkedId", "triggers"]);
 
+  function withoutKeys(value, keys) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+    const copy = { ...value };
+    for (const key of keys) delete copy[key];
+    return copy;
+  }
+
   // Recursively render any JSON value as a readable tree so the modal shows
   // every meaningful property of an element. Node-linking ids (see
   // LINK_ID_KEYS) are skipped so the model reads in domain terms.
@@ -591,17 +616,30 @@
     return section;
   }
 
+  function screenModalDescription(item) {
+    const text = descriptionText(item);
+    if (!text) return null;
+    const desc = document.createElement("div");
+    desc.className = "modal-screen-description";
+    desc.textContent = text;
+    return desc;
+  }
+
   function openDetail(type, item, ctx) {
     detailCtx = ctx || null;
     const name = item && (item.title || item.name);
     modalTitle.textContent = (name ? String(name) : "(untitled)") +
       "  ·  " + (TYPE_LABELS[type] || type);
     modalBody.innerHTML = "";
+    let detailItem = item == null ? {} : item;
     if (type === "screen") {
+      const desc = screenModalDescription(item);
+      if (desc) modalBody.appendChild(desc);
       const imgs = screenImagesSection(detailCtx);
       if (imgs) modalBody.appendChild(imgs);
+      detailItem = withoutKeys(detailItem, ["description"]);
     }
-    modalBody.appendChild(renderValue(item == null ? {} : item));
+    modalBody.appendChild(renderValue(detailItem));
     if (modalFoot) modalFoot.hidden = !detailCtx;
     modalBackdrop.hidden = false;
   }
