@@ -296,7 +296,10 @@
     name.textContent = f.name != null ? String(f.name) : "?";
     head.appendChild(name);
 
-    if (f.type != null) {
+    const ex = fieldExampleText(f, opts);
+    const compactExample = opts && opts.compactWhenExample && ex != null;
+
+    if (f.type != null && !compactExample) {
       const ty = document.createElement("span");
       ty.className = "f-type";
       ty.textContent = String(f.type);
@@ -304,11 +307,11 @@
     }
 
     const flags = [];
-    if (f.idAttribute) flags.push("id");
-    if (f.optional) flags.push("opt");
-    if (f.generated) flags.push("gen");
-    if (f.technicalAttribute) flags.push("tech");
-    if (f.cardinality === "List") flags.push("list");
+    if (f.idAttribute && !compactExample) flags.push("id");
+    if (f.optional && !compactExample) flags.push("opt");
+    if (f.generated && !compactExample) flags.push("gen");
+    if (f.technicalAttribute && !compactExample) flags.push("tech");
+    if (f.cardinality === "List" && !compactExample) flags.push("list");
     for (const fl of flags) {
       const b = document.createElement("span");
       b.className = "f-flag";
@@ -316,7 +319,6 @@
       head.appendChild(b);
     }
 
-    const ex = fieldExampleText(f, opts);
     if (ex != null) {
       const e = document.createElement("span");
       e.className = "f-ex";
@@ -482,7 +484,7 @@
         }
         group.appendChild(st);
         const fields = asArray(step && step.fields);
-        if (fields.length) group.appendChild(fieldList(fields, null, { shortenUuid: true }));
+        if (fields.length) group.appendChild(fieldList(fields, null, { shortenUuid: true, compactWhenExample: true }));
       }
       wrap.appendChild(group);
     }
@@ -738,6 +740,20 @@
     if (!opts || opts.scroll !== false) card.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
+  function scrollCardFullyIntoView(card) {
+    const pr = preview.getBoundingClientRect();
+    const cr = card.getBoundingClientRect();
+    const header = card.closest(".slice-column")?.querySelector(".slice-header");
+    const hr = header ? header.getBoundingClientRect() : null;
+    const top = Math.max(pr.top, hr ? hr.bottom : pr.top) + 6;
+    const bottom = pr.bottom - 14;
+
+    if (cr.top < top) preview.scrollTop += cr.top - top;
+    else if (cr.bottom > bottom) preview.scrollTop += cr.bottom - bottom;
+
+    card.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+
   // Slice columns as arrays of their cards. DOM order matches the visual layout:
   // top-to-bottom within a column, left-to-right across columns.
   function navColumns() {
@@ -779,6 +795,7 @@
       const cards = cols[state.col];
       const next = state.row + dy;
       if (next >= 0 && next < cards.length) selectCard(cards[next]);
+      else if (dy < 0 && state.row === 0) scrollCardFullyIntoView(cards[state.row]);
       return;
     }
     // Horizontal: step to the next non-empty column, landing on the card whose
