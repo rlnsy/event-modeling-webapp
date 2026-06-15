@@ -1382,6 +1382,55 @@
     drawFlowLines();
   }
 
+  function pxNumber(value) {
+    const n = Number.parseFloat(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function cardChromeWidth(card) {
+    const s = getComputedStyle(card);
+    return pxNumber(s.paddingLeft) + pxNumber(s.paddingRight) +
+      pxNumber(s.borderLeftWidth) + pxNumber(s.borderRightWidth);
+  }
+
+  function fieldLineContentWidth(line) {
+    const r = line.getBoundingClientRect();
+    return Math.ceil(Math.max(line.scrollWidth, r.width));
+  }
+
+  function measureCardFieldWidth(card) {
+    let fieldWidth = 0;
+    const lines = card.querySelectorAll(".card-fields li:not(.f-redundant):not(.has-sub), .card-fields .f-head");
+    for (const line of lines) {
+      fieldWidth = Math.max(fieldWidth, fieldLineContentWidth(line));
+    }
+    return Math.max(200, Math.ceil(fieldWidth + cardChromeWidth(card)));
+  }
+
+  function fitCardAndSliceWidths(row) {
+    for (const col of row.querySelectorAll(".slice-column")) {
+      col.style.removeProperty("--slice-width");
+      for (const card of col.querySelectorAll(".card")) {
+        card.style.removeProperty("--card-width");
+      }
+    }
+
+    for (const card of row.querySelectorAll(".card")) {
+      card.style.setProperty("--card-width", measureCardFieldWidth(card) + "px");
+    }
+
+    for (const col of row.querySelectorAll(".slice-column")) {
+      let width = 200;
+      for (const card of col.querySelectorAll(".card")) {
+        width = Math.max(width, Math.ceil(card.getBoundingClientRect().width));
+      }
+      for (const lane of col.querySelectorAll(".lane.side-by-side")) {
+        width = Math.max(width, Math.ceil(lane.scrollWidth));
+      }
+      col.style.setProperty("--slice-width", width + "px");
+    }
+  }
+
   if (paneToggle) {
     paneToggle.addEventListener("click", () => setEditorHidden(!editorHidden));
   }
@@ -1505,6 +1554,7 @@
 
     lastOrdered = ordered;
     preview.appendChild(row);
+    fitCardAndSliceWidths(row);
     restoreSelection(prevSel);
     if (flowObserver) { flowObserver.disconnect(); flowObserver.observe(row); }
     drawFlowLines();

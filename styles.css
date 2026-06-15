@@ -361,7 +361,8 @@ svg.flow-lines {
 
 .slice-column {
   flex: 0 0 auto;
-  width: 200px;
+  min-width: 200px;
+  width: var(--slice-width, 200px);
   display: flex;
   flex-direction: column;
   /* Roomy gap between lanes so the flow-line arcs + arrowheads connecting
@@ -369,27 +370,30 @@ svg.flow-lines {
   gap: 46px;
 }
 .slice-column.has-side-by-side-events {
-  width: calc((200px * var(--event-count)) + (10px * (var(--event-count) - 1)));
+  width: var(--slice-width, 200px);
 }
+.slice-column .lane,
 .slice-column.has-side-by-side-events .lane:not(.side-by-side) {
   align-items: center;
 }
-.slice-column.has-side-by-side-events .lane:not(.side-by-side) > .card,
-.slice-column.has-side-by-side-events .slice-header {
-  width: 200px;
+.slice-column.has-side-by-side-events .lane:not(.side-by-side) > .card {
+  min-width: 200px;
 }
 .slice-column.has-side-by-side-events .slice-header {
   align-self: center;
+  min-width: 200px;
 }
 .slice-column .lane.side-by-side {
   flex-direction: row;
+  justify-content: center;
   gap: 10px;
 }
 .slice-column .lane.side-by-side.event-lane {
   margin-bottom: 18px;
 }
 .slice-column .lane.side-by-side > .card {
-  flex: 0 0 200px;
+  flex: 0 0 auto;
+  min-width: 200px;
 }
 
 .slice-header {
@@ -425,6 +429,9 @@ svg.flow-lines {
   border: 1px solid var(--line);
   border-radius: 5px;
   padding: 6px 8px;
+  box-sizing: border-box;
+  min-width: 200px;
+  width: var(--card-width, 200px);
   cursor: pointer;
   transition: background 0.1s, border-color 0.1s;
 }
@@ -486,9 +493,10 @@ svg.flow-lines {
   color: var(--fg-dim);
   line-height: 16px;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
   gap: 5px;
+  white-space: nowrap;
 }
 .card .card-fields .f-name { color: var(--fg); }
 .card .card-fields .f-map { color: var(--fg-faint); }
@@ -507,9 +515,10 @@ svg.flow-lines {
 .card .card-fields li.has-sub { display: block; }
 .card .f-head {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
   gap: 5px;
+  white-space: nowrap;
 }
 .card .f-toggle {
   cursor: pointer;
