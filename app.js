@@ -1085,6 +1085,10 @@
     updateEditToggleBtn();
     updatePaneToggle();
     if (!editorHidden) sizeEditor(); // editor is back; refit it to its text
+    // Toggling the pane flips the .preview-row padding (see styles.css) without
+    // changing the row's content-box, so the flow-line ResizeObserver never
+    // fires — redraw the overlay explicitly so the arrows track the cards.
+    drawFlowLines();
   }
 
   if (paneToggle) {
