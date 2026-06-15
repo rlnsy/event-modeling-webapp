@@ -1822,7 +1822,7 @@
       const n = completenessWarnings.length;
       setModelStatus("warn", `${n} completeness warning${n > 1 ? "s" : ""}`);
     } else {
-      setModelStatus("ok", "Model complete");
+      setModelStatus("ok", "Model OK");
     }
     showProblems(completenessWarnings);
   }

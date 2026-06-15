@@ -207,6 +207,10 @@ body.editor-hidden .pane-toggle { left: 4px; }
   overflow: hidden;
 }
 
+/* The .statusbar display:flex overrides the [hidden] attribute, so the
+   editor bottom bar needs an explicit rule to hide when it has no problems. */
+.editor-status[hidden] { display: none; }
+
 /* Editor-scoped problems list stays compact so it never crowds the textarea. */
 .editor-problems { max-height: 30vh; }
 
