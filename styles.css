@@ -548,21 +548,25 @@ svg.flow-lines {
   font-size: 11px;
 }
 
-.card .screen-img-wrap { display: block; }
+.card .screen-img-wrap { display: block; text-align: center; }
 .card .screen-img-wrap:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 4px;
 }
+/* The image sizes to its own content (no forced width/object-fit), so the box
+   never letterboxes. A uniform padding then yields a constant-width gap between
+   the image and its border whatever the aspect ratio. */
 .card .screen-img {
-  display: block;
-  width: 100%;
+  display: inline-block;
+  max-width: 100%;
   max-height: 150px;
-  object-fit: contain;
   margin-top: 6px;
+  padding: 6px;
   border: 1px solid var(--line);
   border-radius: 4px;
   background: var(--bg);
+  box-sizing: border-box;
 }
 .card .img-missing {
   margin-top: 6px;
