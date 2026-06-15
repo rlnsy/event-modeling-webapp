@@ -10,7 +10,6 @@
   const problems = document.getElementById("problems");
   const problemsList = document.getElementById("problemsList");
   const formatBtn = document.getElementById("formatBtn");
-  const clearBtn = document.getElementById("clearBtn");
   const downloadBtn = document.getElementById("downloadBtn");
   const themeToggle = document.getElementById("themeToggle");
   const sessionSelect = document.getElementById("sessionSelect");
@@ -1856,6 +1855,13 @@
       if (s.id === activeId) opt.selected = true;
       sessionSelect.appendChild(opt);
     }
+    updateTitle();
+  }
+
+  // Reflect the active session's name in the browser tab title.
+  function updateTitle() {
+    const active = Sessions.get(activeId);
+    document.title = active ? active.name : "Event Modeling Tool";
   }
 
   // Open a session: make it active, load its text, validate, refresh the select.
@@ -1974,12 +1980,6 @@
 
   formatBtn.addEventListener("click", format);
   downloadBtn.addEventListener("click", downloadActive);
-  clearBtn.addEventListener("click", () => {
-    input.value = "";
-    input.focus();
-    saveActive();
-    validate();
-  });
 
   // Open the active session (creating a seeded default on first run).
   const active = Sessions.ensureDefault();

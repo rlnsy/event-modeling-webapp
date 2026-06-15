@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JSON Editor &middot; Event Modeling</title>
+  <title>Event Modeling Tool</title>
   <link rel="stylesheet" href="styles.css" />
   <!-- Applies the saved theme before paint to avoid a flash of the wrong theme. -->
   <script src="theme.js"></script>
@@ -18,8 +18,6 @@
         <button id="renameSessionBtn" type="button" title="Rename session">Rename</button>
         <button id="deleteSessionBtn" type="button" title="Delete session">Delete</button>
       </div>
-      <button id="formatBtn" type="button" title="Pretty-print (Ctrl/Cmd+S)">Format</button>
-      <button id="clearBtn" type="button">Clear</button>
       <button id="downloadBtn" type="button" title="Export session as JSON">Export</button>
       <button id="themeToggle" type="button" title="Theme" aria-label="Theme"></button>
     </div>
@@ -29,6 +27,8 @@
     <div class="editor" id="editor">
       <div class="gutter" id="gutter" aria-hidden="true"></div>
       <div class="input-stack">
+        <button id="formatBtn" type="button" class="editor-format"
+          title="Pretty-print (Ctrl/Cmd+S)">Format</button>
         <pre class="highlight" id="highlight" aria-hidden="true"></pre>
         <textarea id="input" spellcheck="false" autocomplete="off"
           autocapitalize="off" wrap="off"
