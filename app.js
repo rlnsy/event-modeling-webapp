@@ -1094,6 +1094,27 @@
     return set;
   }
 
+  function redundantEventFieldSigs(slice) {
+    const redundant = commandFieldSigs(slice);
+    const events = asArray(slice && slice.events);
+    if (events.length < 2 || redundant.size === 0) return redundant;
+
+    const eventCounts = new Map();
+    for (const ev of events) {
+      const seen = new Set();
+      for (const f of asArray(ev && ev.fields)) {
+        if (!f || typeof f !== "object" || f.name == null) continue;
+        seen.add(fieldSig(f));
+      }
+      for (const sig of seen) eventCounts.set(sig, (eventCounts.get(sig) || 0) + 1);
+    }
+
+    for (const [sig, count] of eventCounts) {
+      if (count === 1) redundant.delete(sig);
+    }
+    return redundant;
+  }
+
   // Every event across the whole model, in slice/array order. Read models pick
   // their dependencies from this list, so a read model can depend on events
   // outside its own slice.
@@ -1400,6 +1421,11 @@
       const slice = s || {};
       const col = document.createElement("div");
       col.className = "slice-column";
+      const sideBySideEvents = slice.sliceType === "STATE_CHANGE" ? asArray(slice.events).length : 0;
+      if (sideBySideEvents > 1) {
+        col.classList.add("has-side-by-side-events");
+        col.style.setProperty("--event-count", sideBySideEvents);
+      }
 
       const header = document.createElement("div");
       header.className = "slice-header";
@@ -1427,6 +1453,7 @@
       for (const laneDef of LANES) {
         const lane = document.createElement("div");
         lane.className = "lane";
+        if (laneDef.type === "event" && sideBySideEvents > 1) lane.classList.add("event-lane", "side-by-side");
         let count = 0;
 
         if (laneDef.type === "screen") {
@@ -1451,8 +1478,9 @@
         } else {
           for (const key of laneDef.keys) {
             const type = (laneDef.typeFor && laneDef.typeFor[key]) || laneDef.type;
-            // Events hide fields identical to ones already on the slice's commands.
-            const opts = type === "event" ? { redundant: commandFieldSigs(slice) } : null;
+            // Events hide fields identical to ones already on the slice's commands,
+            // except in multi-event slices where event-specific fields need to stay visible.
+            const opts = type === "event" ? { redundant: redundantEventFieldSigs(slice) } : null;
             asArray(slice[key]).forEach((item, idx) => {
               lane.appendChild(cardFor(type, item, makeCtx(slice.id, i, key, item, idx), opts));
               count++;
@@ -1692,7 +1720,9 @@
       if (!s) return;
       for (const [fromKey, toKey] of INTRA_FLOW) {
         for (const from of asArray(s[fromKey])) {
-          for (const to of asArray(s[toKey])) add(from, to, "intra");
+          for (const to of asArray(s[toKey])) {
+            add(from, to, fromKey === "commands" && toKey === "events" ? "command-event" : "intra");
+          }
         }
       }
     });
@@ -1739,11 +1769,6 @@
   // lines up with the curve regardless of browser marker-orient behavior. Boxes
   // are { x, y, w, h, cx, cy } in the row's content coordinate space.
 
-  // Intra-slice edge: two cards stacked in the same column a short gap apart.
-  // The line bows out to the left (into the gutter, against the empty background
-  // where a thin line reads clearly) and then comes straight back in along the
-  // vertical — entering the target's top/bottom edge dead vertical, so the
-  // arrowhead points straight down (or up) and lines up with the approach.
   // A clean straight vertical connector between two cards stacked in the same
   // column: source edge center to target edge center. Spans exactly the gap
   // between them, so it never overshoots into either card.
@@ -1755,35 +1780,35 @@
     return { d, tip: q, dir: { x: 0, y: down ? 1 : -1 } };
   }
 
-  // Cross-slice event -> read-model edge. Always enters the bottom of the read
-  // model on a dead-vertical final segment, so the upward arrowhead is guaranteed
-  // to line up. The shape depends on the event's position relative to the read
-  // model:
-  //   - event at/above the read model: a straight-sided U out of the event's
-  //     bottom, down to a baseline below both cards, and straight up.
-  //   - event clearly below the read model (the usual case — events sit a lane
-  //     lower): a right-angle corner — straight out of the event's right side,
-  //     then 90° straight up into the read model. Only used when the event sits
-  //     far enough below for a clean rise; when they're near the same level the
-  //     corner would be mashed, so it falls back to the U.
+  // Command -> event edges may fan out when a state-change slice has multiple
+  // events, so keep them orthogonal instead of drawing diagonals.
+  function commandEventPath(a, b) {
+    const down = b.cy >= a.cy;
+    const p = { x: a.cx, y: down ? a.y + a.h : a.y };
+    const q = { x: b.cx, y: down ? b.y : b.y + b.h };
+    if (Math.abs(p.x - q.x) < 0.5) {
+      return { d: "M" + p.x + "," + p.y + " L" + q.x + "," + q.y, tip: q, dir: { x: 0, y: down ? 1 : -1 } };
+    }
+    const turnY = (p.y + q.y) / 2;
+    const d = "M" + p.x + "," + p.y +
+      " L" + p.x + "," + turnY +
+      " L" + q.x + "," + turnY +
+      " L" + q.x + "," + q.y;
+    return { d, tip: q, dir: { x: 0, y: down ? 1 : -1 } };
+  }
+
+  // Cross-slice event -> read-model edge. Route down from the event, horizontally
+  // below the lane, then up into the read model so left-side events don't cut
+  // across neighbouring events on their way to the read model.
   const CROSS_DIP = 40;      // px the U's baseline sits below the lower card
-  const CROSS_MIN_RISE = 28; // min vertical room below the read model for a corner
   function crossPath(a, b) {
     const q = { x: b.cx, y: b.y + b.h }; // enter read model from below, head up
-    let d;
-    if (a.cy - q.y >= CROSS_MIN_RISE) {
-      const p = { x: a.x + a.w, y: a.cy }; // exit the event's right side
-      d = "M" + p.x + "," + p.y +
-        " L" + q.x + "," + p.y +
-        " L" + q.x + "," + q.y;
-    } else {
-      const p = { x: a.cx, y: a.y + a.h }; // exit the event's bottom
-      const baseY = Math.max(a.y + a.h, b.y + b.h) + CROSS_DIP;
-      d = "M" + p.x + "," + p.y +
-        " L" + p.x + "," + baseY +
-        " L" + q.x + "," + baseY +
-        " L" + q.x + "," + q.y;
-    }
+    const p = { x: a.cx, y: a.y + a.h }; // exit the event's bottom
+    const baseY = Math.max(a.y + a.h, b.y + b.h) + CROSS_DIP;
+    const d = "M" + p.x + "," + p.y +
+      " L" + p.x + "," + baseY +
+      " L" + q.x + "," + baseY +
+      " L" + q.x + "," + q.y;
     return { d, tip: q, dir: { x: 0, y: -1 } };
   }
 
@@ -1834,7 +1859,8 @@
     for (const { fromId, toId, kind } of edges) {
       const a = boxOf(fromId), b = boxOf(toId);
       if (!a || !b) continue;
-      const shape = kind === "cross" ? crossPath(a, b) : intraPath(a, b);
+      const shape = kind === "cross" ? crossPath(a, b) :
+        kind === "command-event" ? commandEventPath(a, b) : intraPath(a, b);
       const path = document.createElementNS(SVG_NS, "path");
       path.setAttribute("class", "flow-line");
       path.setAttribute("d", shape.d);

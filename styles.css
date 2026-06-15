@@ -368,6 +368,29 @@ svg.flow-lines {
      stacked elements (screen->command->event) have space to read clearly. */
   gap: 46px;
 }
+.slice-column.has-side-by-side-events {
+  width: calc((200px * var(--event-count)) + (10px * (var(--event-count) - 1)));
+}
+.slice-column.has-side-by-side-events .lane:not(.side-by-side) {
+  align-items: center;
+}
+.slice-column.has-side-by-side-events .lane:not(.side-by-side) > .card,
+.slice-column.has-side-by-side-events .slice-header {
+  width: 200px;
+}
+.slice-column.has-side-by-side-events .slice-header {
+  align-self: center;
+}
+.slice-column .lane.side-by-side {
+  flex-direction: row;
+  gap: 10px;
+}
+.slice-column .lane.side-by-side.event-lane {
+  margin-bottom: 18px;
+}
+.slice-column .lane.side-by-side > .card {
+  flex: 0 0 200px;
+}
 
 .slice-header {
   border-bottom: 1px solid var(--line);
