@@ -683,11 +683,22 @@ svg.flow-lines {
 .detail-array > li + li { border-top: 1px dashed var(--line); }
 
 /* ---------- Add controls ---------- */
+/* Pinned to the top-left of the scrolling preview so the edit toggle and the
+   "+ Add Slice" button stay in reach no matter how far the slice canvas is
+   scrolled. Negative margins let the strip span the preview's padding so its
+   background fully masks slice content scrolling underneath; the matching
+   padding keeps the buttons where they sat before. Sticks on both axes. */
 .preview-toolbar {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 4;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin: -14px -14px 34px;
+  padding: 2px 8px;
+  background: var(--bg-elev);
 }
 
 /* Edit toggle pinned to the top-left of the toolbar: shows/hides the JSON
