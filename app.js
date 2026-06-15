@@ -299,6 +299,15 @@
     const ex = fieldExampleText(f, opts);
     const compactExample = opts && opts.compactWhenExample && ex != null;
 
+    const mapping = fieldMapping(f);
+    if (mapping) {
+      const computed = fieldSources(f, f.name).length > 1;
+      const map = document.createElement("span");
+      map.className = computed ? "f-flag" : "f-map";
+      map.textContent = computed ? "computed" : "<- " + mapping;
+      head.appendChild(map);
+    }
+
     if (f.type != null && !compactExample) {
       const ty = document.createElement("span");
       ty.className = "f-type";
@@ -1896,8 +1905,35 @@
     return out;
   }
 
-  function specFieldSig(path, field) {
-    return path + "\0" + (field && field.type != null ? String(field.type) : "");
+  function fieldMapping(field) {
+    return field && field.mapping != null ? String(field.mapping).trim() : "";
+  }
+
+  function fieldSources(field, fallback) {
+    const mapping = fieldMapping(field);
+    if (!mapping) return [fallback].filter(Boolean);
+    return mapping.split("+").map((s) => s.trim()).filter(Boolean);
+  }
+
+  function mappedSourceText(sources, fallback) {
+    if (sources.length === 1 && sources[0] === fallback) return "";
+    return sources.join("+");
+  }
+
+  function addAvailableField(map, key, field) {
+    if (!key) return;
+    let types = map.get(key);
+    if (!types) { types = new Set(); map.set(key, types); }
+    if (field && field.type != null) types.add(field.type);
+  }
+
+  function availableFields(fields) {
+    const out = new Map();
+    for (const { field, path } of leafFields(fields)) {
+      addAvailableField(out, path, field);
+      addAvailableField(out, field.name, field);
+    }
+    return out;
   }
 
   function specificationFieldFindings(model, entries) {
@@ -1913,15 +1949,29 @@
             if (!step || step.type === "SPEC_ERROR" || !step.linkedId) continue;
             const linked = byId.get(step.linkedId);
             if (!linked) continue;
-            const linkedFields = new Set(leafFields(linked.fields).map(({ field, path }) => specFieldSig(path, field)));
+            const linkedFields = availableFields(linked.fields);
             const stepTitle = step.title != null && step.title !== "" ? String(step.title) : "(untitled)";
             for (const { field, path } of leafFields(step.fields)) {
-              if (linkedFields.has(specFieldSig(path, field))) continue;
               const linkedTitle = linked.title != null && linked.title !== "" ? String(linked.title) : linked.id;
-              findings.push({
-                kind: "warning", locLabel: "spec", elementId: spec.id,
-                msg: `Specification '${specTitle}': ${label} step '${stepTitle}' field '${path}' does not exist on linked ${linked.type} '${linkedTitle}'.`,
-              });
+              const sources = fieldSources(field, path);
+              const missing = sources.filter((source) => !linkedFields.has(source));
+              if (missing.length) {
+                findings.push({
+                  kind: "warning", locLabel: "spec", elementId: spec.id,
+                  msg: `Specification '${specTitle}': ${label} step '${stepTitle}' field '${path}'${mappedSourceText(sources, path) ? ` mapped from '${mappedSourceText(sources, path)}'` : ""} has missing linked ${linked.type} source field(s): ${missing.join(", ")}.`,
+                });
+                continue;
+              }
+              if (sources.length === 1) {
+                const source = sources[0];
+                const types = linkedFields.get(source);
+                if (field.type != null && types && types.size > 0 && !types.has(field.type)) {
+                  findings.push({
+                    kind: "warning", locLabel: "spec", elementId: spec.id,
+                    msg: `Specification '${specTitle}': ${label} step '${stepTitle}' field '${path}'${source !== path ? ` mapped from '${source}'` : ""} type ${field.type} differs from linked ${linked.type} '${linkedTitle}' type ${Array.from(types).join(" / ")}.`,
+                  });
+                }
+              }
             }
           }
         }
@@ -1961,28 +2011,32 @@
       // data still contributes the leaf names a consumer can draw from.
       const available = new Map();
       for (const src of srcEls) {
-        for (const { field: f } of leafFields(src.fields)) {
-          let types = available.get(f.name);
-          if (!types) { types = new Set(); available.set(f.name, types); }
-          if (f.type != null) types.add(f.type);
+        for (const { field: f, path } of leafFields(src.fields)) {
+          addAvailableField(available, path, f);
+          addAvailableField(available, f.name, f);
         }
       }
 
       for (const { field: f, path } of leafFields(el.fields)) {
         if (f.generated) continue;
-        if (!available.has(f.name)) {
+        const sources = fieldSources(f, f.name);
+        const missing = sources.filter((source) => !available.has(source));
+        const sourceText = mappedSourceText(sources, f.name);
+        if (missing.length) {
           findings.push({
             kind: "warning", locLabel: "completeness", elementId: el.id,
-            msg: `${label} '${title}': field '${path}' has no upstream source.`,
+            msg: `${label} '${title}': field '${path}'${sourceText ? ` mapped from '${sourceText}'` : ""} has missing upstream source field(s): ${missing.join(", ")}.`,
           });
           continue;
         }
+        if (sources.length !== 1) continue;
         // Sourced — but surface a type drift when no source offers a matching type.
-        const types = available.get(f.name);
+        const source = sources[0];
+        const types = available.get(source);
         if (f.type != null && types.size > 0 && !types.has(f.type)) {
           findings.push({
             kind: "warning", locLabel: "type", elementId: el.id,
-            msg: `${label} '${title}': field '${path}' type ${f.type} differs from upstream type ${Array.from(types).join(" / ")}.`,
+            msg: `${label} '${title}': field '${path}'${source !== f.name ? ` mapped from '${source}'` : ""} type ${f.type} differs from upstream type ${Array.from(types).join(" / ")}.`,
           });
         }
       }

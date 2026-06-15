@@ -254,6 +254,12 @@
     name.className = "form-input field-name";
     name.placeholder = "name";
 
+    const mapping = document.createElement("input");
+    mapping.type = "text";
+    mapping.className = "form-input field-mapping";
+    mapping.placeholder = "source";
+    mapping.title = "Upstream source field or path";
+
     const type = selectEl(FIELD_TYPES);
     type.classList.add("field-type");
 
@@ -271,7 +277,7 @@
     remove.title = "Remove field";
     remove.textContent = "×";
 
-    row.append(toggle, name, type, card, opt.wrap, idf.wrap);
+    row.append(toggle, name, mapping, type, card, opt.wrap, idf.wrap);
     if (gen) row.append(gen.wrap);
     row.append(remove);
 
@@ -311,6 +317,7 @@
       source: initial || null,
       read: () => ({
         name: name.value.trim(),
+        mapping: mapping.value.trim(),
         type: type.value,
         cardinality: card.value,
         optional: opt.cb.checked,
@@ -326,6 +333,7 @@
 
     if (initial) {
       if (initial.name) name.value = initial.name;
+      if (initial.mapping) mapping.value = initial.mapping;
       if (initial.type) type.value = initial.type;
       if (initial.cardinality) card.value = initial.cardinality;
       opt.cb.checked = !!initial.optional;
@@ -355,7 +363,7 @@
   // Gather field rows into schema-valid Field objects, dropping nameless rows
   // and omitting attributes left at their defaults to keep the JSON clean. When
   // a row was seeded from an existing field (`source`), the managed values are
-  // merged onto a clone of it so unmanaged attributes (example, mapping,
+  // merged onto a clone of it so unmanaged attributes (example,
   // technicalAttribute, schema) survive the round-trip. Recurses into a row's
   // child rows for Custom fields to build their `subfields`.
   function collectFields(rows) {
@@ -365,6 +373,7 @@
       .map(({ v, source, childRows }) => {
         const f = source ? { ...source } : {};
         f.name = v.name;
+        setOrDelete(f, "mapping", v.mapping);
         f.type = v.type;
         setOrDelete(f, "optional", v.optional);
         setOrDelete(f, "idAttribute", v.idAttribute);
@@ -552,6 +561,12 @@
     const type = selectEl(FIELD_TYPES);
     type.classList.add("spec-field-type");
 
+    const mapping = document.createElement("input");
+    mapping.type = "text";
+    mapping.className = "form-input spec-field-mapping";
+    mapping.placeholder = "source";
+    mapping.title = "Linked element source field or path";
+
     const example = document.createElement("input");
     example.type = "text";
     example.className = "form-input spec-field-example";
@@ -572,7 +587,7 @@
     remove.title = "Remove field";
     remove.textContent = "×";
 
-    row.append(name, type, example, genUuid, remove);
+    row.append(name, mapping, type, example, genUuid, remove);
 
     function syncUuidButton() {
       genUuid.hidden = type.value !== "UUID";
@@ -585,6 +600,7 @@
       read: () => {
         const out = { ...source };
         out.name = name.value.trim();
+        setOrDelete(out, "mapping", mapping.value.trim());
         out.type = type.value;
         const ex = parseFieldExample(example.value);
         if (ex == null) delete out.example;
@@ -601,6 +617,7 @@
 
     if (initial) {
       if (initial.name) name.value = initial.name;
+      if (initial.mapping) mapping.value = initial.mapping;
       if (initial.type) type.value = initial.type;
       example.value = fieldExampleText(initial.example);
     }

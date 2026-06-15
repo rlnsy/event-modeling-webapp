@@ -491,6 +491,7 @@ svg.flow-lines {
   gap: 5px;
 }
 .card .card-fields .f-name { color: var(--fg); }
+.card .card-fields .f-map { color: var(--fg-faint); }
 .card .card-fields .f-type { color: var(--accent); }
 .card .card-fields .f-ex { color: var(--ok); }
 .card .card-fields .f-flag {
@@ -1114,6 +1115,7 @@ input[type="checkbox"].form-input {
 }
 .field-row .form-input { padding: 5px 7px; font-size: 12.5px; }
 .field-name { flex: 1 1 auto; min-width: 0; }
+.field-mapping { flex: 1 1 110px; min-width: 0; }
 .field-type { flex: 0 0 auto; }
 .field-card { flex: 0 0 auto; }
 
@@ -1333,6 +1335,10 @@ input[type="checkbox"].form-input {
   font-size: 12.5px;
 }
 .spec-field-name {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.spec-field-mapping {
   flex: 1 1 120px;
   min-width: 0;
 }
