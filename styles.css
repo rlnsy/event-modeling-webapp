@@ -628,8 +628,28 @@ svg.flow-lines {
 .status-text { font-weight: 600; }
 .status-meta { color: var(--fg-faint); margin-left: auto; font-variant-numeric: tabular-nums; }
 
-/* Single model-status indicator pinned to the bottom-right of the footer. */
-.model-status { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.model-status {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+.model-status.ok   .status-dot { background: var(--ok); }
+.model-status.err  .status-dot { background: var(--err); }
+.model-status.warn .status-dot { background: var(--warn); }
+.model-status.ok   .status-text { color: var(--ok); }
+.model-status.err  .status-text { color: var(--err); }
+.model-status.warn .status-text { color: var(--warn); }
 
 /* Short page footer sitting beneath the global status bar. */
 .page-footer {
@@ -804,7 +824,7 @@ svg.flow-lines {
 .edit-toggle-btn svg { width: 15px; height: 15px; }
 
 /* Full-width visualizer: the JSON editor is hidden by default and revealed via
-   the edit toggle. The topbar and statusbar stay visible. */
+   the edit toggle. The topbar and floating preview controls stay visible. */
 body.editor-hidden .editor { display: none; }
 body.editor-hidden .preview {
   flex: 1 1 100%;

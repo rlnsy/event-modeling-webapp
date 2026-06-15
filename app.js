@@ -4,7 +4,7 @@
   const input = document.getElementById("input");
   const highlight = document.getElementById("highlight");
   const gutter = document.getElementById("gutter");
-  const statusbar = document.getElementById("statusbar");
+  const modelStatus = document.getElementById("modelStatus");
   const modelStatusText = document.getElementById("modelStatusText");
   const editorStatus = document.getElementById("editorStatus");
   const editorStatusText = document.getElementById("editorStatusText");
@@ -1221,9 +1221,9 @@
     editorStatusMeta.textContent = meta || "";
   }
 
-  // Single model-status indicator in the footer bottom-right.
+  // Single model-status indicator floating over the preview bottom-right.
   function setModelStatus(state, text) {
-    statusbar.className = "statusbar" + (state ? " " + state : "");
+    modelStatus.className = "model-status" + (state ? " " + state : "");
     modelStatusText.textContent = text;
   }
 
