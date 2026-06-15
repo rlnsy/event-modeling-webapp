@@ -28,8 +28,12 @@
       <div class="editor-body">
         <div class="gutter" id="gutter" aria-hidden="true"></div>
         <div class="input-stack">
-          <button id="formatBtn" type="button" class="editor-format"
-            title="Pretty-print (Ctrl/Cmd+S)">Format</button>
+          <div class="editor-actions">
+            <button id="formatBtn" type="button" class="editor-action"
+              title="Pretty-print (Ctrl/Cmd+S)">Format</button>
+            <button id="copyJsonBtn" type="button" class="editor-action"
+              title="Copy JSON">Copy</button>
+          </div>
           <pre class="highlight" id="highlight" aria-hidden="true"></pre>
           <textarea id="input" spellcheck="false" autocomplete="off"
             autocapitalize="off" wrap="off"
@@ -101,6 +105,8 @@
       </footer>
     </form>
   </div>
+
+  <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
 
   <script src="schema.js"></script>
   <script src="sessions.js"></script>

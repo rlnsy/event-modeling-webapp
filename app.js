@@ -14,6 +14,7 @@
   const editorProblems = document.getElementById("editorProblems");
   const editorProblemsList = document.getElementById("editorProblemsList");
   const formatBtn = document.getElementById("formatBtn");
+  const copyJsonBtn = document.getElementById("copyJsonBtn");
   const downloadBtn = document.getElementById("downloadBtn");
   const themeToggle = document.getElementById("themeToggle");
   const sessionSelect = document.getElementById("sessionSelect");
@@ -29,11 +30,44 @@
   const modalFoot = document.getElementById("modalFoot");
   const modalEditBtn = document.getElementById("modalEdit");
   const modalDeleteBtn = document.getElementById("modalDelete");
+  const toastRegion = document.getElementById("toastRegion");
 
   // ---------- Helpers ----------
 
   function escapeHtml(s) {
     return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  }
+
+  function showToast(text) {
+    if (!toastRegion) return;
+    const toast = document.createElement("div");
+    toast.className = "toast";
+    toast.textContent = text;
+    toastRegion.replaceChildren(toast);
+    window.setTimeout(() => toast.classList.add("leaving"), 1800);
+    window.setTimeout(() => toast.remove(), 2200);
+  }
+
+  function copyText(text, successText) {
+    const onSuccess = () => showToast(successText);
+    const onError = () => showToast("Copy failed");
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(onSuccess, onError);
+      return;
+    }
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy") ? onSuccess() : onError();
+    } catch (_) {
+      onError();
+    }
+    ta.remove();
   }
 
   // Translate an absolute character offset into a 1-based {line, col}.
@@ -1595,6 +1629,7 @@
       }
       li.appendChild(loc);
       li.appendChild(msg);
+      li.addEventListener("click", () => copyText(`${loc.textContent} ${msg.textContent}`, "Problem copied"));
       if (it.offset != null) {
         li.addEventListener("click", () => {
           input.focus();
@@ -2434,6 +2469,7 @@
   }
 
   formatBtn.addEventListener("click", format);
+  if (copyJsonBtn) copyJsonBtn.addEventListener("click", () => copyText(input.value, "JSON copied"));
   downloadBtn.addEventListener("click", downloadActive);
 
   // Open the active session (creating a seeded default on first run).
