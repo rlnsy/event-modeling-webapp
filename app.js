@@ -385,7 +385,9 @@
     card.appendChild(t);
     if (body) card.appendChild(body);
     const open = () => openDetail(type, item, ctx);
-    card.addEventListener("click", open);
+    // Clicking also makes this the keyboard-selected card so arrow nav (and the
+    // modal-swap on arrows) continues from here. Don't scroll on a click.
+    card.addEventListener("click", () => { selectCard(card, { scroll: false }); open(); });
     card.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
     });
@@ -620,6 +622,118 @@
   });
   if (modalEditBtn) modalEditBtn.addEventListener("click", () => editComponent(detailCtx));
   if (modalDeleteBtn) modalDeleteBtn.addEventListener("click", () => deleteComponent(detailCtx));
+
+  // ---------- Keyboard navigation over the diagram (issue #10) ----------
+  // The preview is a row of slice columns, each a vertical stack of cards. Arrow
+  // keys / hjkl move the selection — vertically within a slice, horizontally
+  // between slices while preserving vertical position — and Space/Enter opens the
+  // selected card's detail modal. Selection is just a `.selected` class on a card.
+  let selectedEl = null;
+
+  function selectCard(card, opts) {
+    if (!card) return;
+    if (selectedEl && selectedEl !== card) selectedEl.classList.remove("selected");
+    selectedEl = card;
+    card.classList.add("selected");
+    // `nearest` keeps the card on screen without fighting the sticky slice header.
+    if (!opts || opts.scroll !== false) card.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+
+  // Slice columns as arrays of their cards. DOM order matches the visual layout:
+  // top-to-bottom within a column, left-to-right across columns.
+  function navColumns() {
+    return [...preview.querySelectorAll(".slice-column")].map((col) => [...col.querySelectorAll(".card")]);
+  }
+
+  // Locate the current selection as { col, row } indices, or null.
+  function navState(cols) {
+    if (!selectedEl) return null;
+    for (let c = 0; c < cols.length; c++) {
+      const r = cols[c].indexOf(selectedEl);
+      if (r !== -1) return { col: c, row: r };
+    }
+    return null;
+  }
+
+  // The card whose vertical center is nearest the viewport coordinate `y`.
+  function nearestCard(cards, y) {
+    let best = null, bestDist = Infinity;
+    for (const card of cards) {
+      const r = card.getBoundingClientRect();
+      const d = Math.abs((r.top + r.bottom) / 2 - y);
+      if (d < bestDist) { bestDist = d; best = card; }
+    }
+    return best;
+  }
+
+  function moveSelection(dx, dy) {
+    const cols = navColumns();
+    if (cols.length === 0) return;
+    const state = navState(cols);
+    // Nothing selected yet: start at the top-left card.
+    if (!state) {
+      for (const cards of cols) if (cards.length) { selectCard(cards[0]); return; }
+      return;
+    }
+    if (dy !== 0) {
+      // Vertical: move within the current column, clamped to its ends (no wrap).
+      const cards = cols[state.col];
+      const next = state.row + dy;
+      if (next >= 0 && next < cards.length) selectCard(cards[next]);
+      return;
+    }
+    // Horizontal: step to the next non-empty column, landing on the card whose
+    // vertical position best matches the current one.
+    const rect = selectedEl.getBoundingClientRect();
+    const y = (rect.top + rect.bottom) / 2;
+    for (let c = state.col + dx; c >= 0 && c < cols.length; c += dx) {
+      if (cols[c].length) { selectCard(nearestCard(cols[c], y)); return; }
+    }
+  }
+
+  // Re-apply a selection captured before a re-render. Prefer the stable element
+  // id; fall back to the old column/row position when the card has no id.
+  function restoreSelection(prev) {
+    if (!prev) return;
+    let card = null;
+    if (prev.id != null) card = preview.querySelector('[data-el-id="' + cssEscape(prev.id) + '"]');
+    if (!card && prev.pos) {
+      const cards = navColumns()[prev.pos.col];
+      if (cards && cards.length) card = cards[Math.min(prev.pos.row, cards.length - 1)];
+    }
+    if (card) selectCard(card, { scroll: false });
+  }
+
+  // Handle an arrow / hjkl key by moving the selection; report whether it applied.
+  function navKey(e) {
+    switch (e.key) {
+      case "ArrowUp": case "k": e.preventDefault(); moveSelection(0, -1); return true;
+      case "ArrowDown": case "j": e.preventDefault(); moveSelection(0, 1); return true;
+      case "ArrowLeft": case "h": e.preventDefault(); moveSelection(-1, 0); return true;
+      case "ArrowRight": case "l": e.preventDefault(); moveSelection(1, 0); return true;
+      default: return false;
+    }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    // Don't hijack typing or browser/editor shortcuts.
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+    // While the detail modal is open: Space closes it (mirrors Space-to-open),
+    // and arrows move to the neighbouring element, swapping the modal to it.
+    if (!modalBackdrop.hidden) {
+      if (e.key === " ") { e.preventDefault(); closeDetail(); return; }
+      if (navKey(e) && selectedEl) selectedEl.click();
+      return;
+    }
+    const formBackdrop = document.getElementById("formBackdrop");
+    if (formBackdrop && !formBackdrop.hidden) return;
+
+    if (navKey(e)) return;
+    // Reuse the card's own click wiring, which opens its detail modal.
+    if ((e.key === " " || e.key === "Enter") && selectedEl) { e.preventDefault(); selectedEl.click(); }
+  });
 
   // ---------- Adding components ----------
   // The textarea is the source of truth: every add parses it, splices the new
@@ -1119,6 +1233,9 @@
     // The edit toggle + "+ Add Slice" buttons live in the floating dock outside
     // this scrolling pane (always available, even for an empty document), so the
     // render only rebuilds the slice canvas.
+    // Capture the keyboard selection so it survives the DOM rebuild below.
+    const prevSel = selectedEl ? { id: selectedEl.dataset.elId, pos: navState(navColumns()) } : null;
+    selectedEl = null;
     preview.innerHTML = "";
 
     const slices = parsed && Array.isArray(parsed.slices) ? parsed.slices : null;
@@ -1209,6 +1326,7 @@
 
     lastOrdered = ordered;
     preview.appendChild(row);
+    restoreSelection(prevSel);
     if (flowObserver) { flowObserver.disconnect(); flowObserver.observe(row); }
     drawFlowLines();
   }
