@@ -130,7 +130,16 @@
       return { id: genId(), title: v.title, fields: Array.isArray(v.fields) ? v.fields : [] };
     }
     if (type === "specification") {
-      return { id: genId(), title: v.title, given: [], when: [], then: [], linkedId: "" };
+      const o = {
+        id: genId(),
+        title: v.title,
+        given: Array.isArray(v.given) ? v.given : [],
+        when: Array.isArray(v.when) ? v.when : [],
+        then: Array.isArray(v.then) ? v.then : [],
+        linkedId: v.linkedId || "",
+      };
+      if (Array.isArray(v.comments) && v.comments.length) o.comments = v.comments;
+      return o;
     }
     return null;
   }
@@ -180,6 +189,12 @@
     }
     if (type === "specification") {
       o.title = v.title;
+      o.given = Array.isArray(v.given) ? v.given : [];
+      o.when = Array.isArray(v.when) ? v.when : [];
+      o.then = Array.isArray(v.then) ? v.then : [];
+      o.linkedId = v.linkedId || o.linkedId || "";
+      if (Array.isArray(v.comments) && v.comments.length) o.comments = v.comments;
+      else delete o.comments;
       return o;
     }
     return o;
@@ -476,6 +491,349 @@
     return { section, read: () => depRows.map((r) => r.dep) };
   }
 
+  // ---------- Specification editor (GWT) ----------
+
+  const SPEC_STEP_TYPE = {
+    COMMAND: "SPEC_COMMAND",
+    EVENT: "SPEC_EVENT",
+    READMODEL: "SPEC_READMODEL",
+  };
+
+  function cloneJson(value) {
+    if (value == null) return value;
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function fieldExampleText(value) {
+    if (value == null) return "";
+    return typeof value === "object" ? JSON.stringify(value) : String(value);
+  }
+
+  function parseFieldExample(text) {
+    const v = text.trim();
+    if (!v) return null;
+    if (v[0] === "{") {
+      try {
+        const parsed = JSON.parse(v);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+      } catch (_) {
+        // Fall through to string storage; schema allows string examples.
+      }
+    }
+    return v;
+  }
+
+  function commentText(comments) {
+    return (Array.isArray(comments) ? comments : [])
+      .map((c) => c && c.description != null ? String(c.description).trim() : "")
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  function commentsFromText(text) {
+    const value = String(text || "").trim();
+    return value ? [{ description: value }] : [];
+  }
+
+  function optionLabel(opt) {
+    return opt.title + " (" + opt.kind + ")";
+  }
+
+  function addSpecFieldRow(rowsEl, rows, initial) {
+    const source = initial ? cloneJson(initial) : {};
+    const row = document.createElement("div");
+    row.className = "spec-field-row";
+
+    const name = document.createElement("input");
+    name.type = "text";
+    name.className = "form-input spec-field-name";
+    name.placeholder = "field";
+
+    const type = selectEl(FIELD_TYPES);
+    type.classList.add("spec-field-type");
+
+    const example = document.createElement("input");
+    example.type = "text";
+    example.className = "form-input spec-field-example";
+    example.placeholder = "example";
+
+    const genUuid = document.createElement("button");
+    genUuid.type = "button";
+    genUuid.className = "spec-example-btn";
+    genUuid.title = "Generate UUID example";
+    genUuid.textContent = "ID";
+    genUuid.addEventListener("click", () => {
+      example.value = genId();
+    });
+
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "field-remove";
+    remove.title = "Remove field";
+    remove.textContent = "×";
+
+    row.append(name, type, example, genUuid, remove);
+
+    function syncUuidButton() {
+      genUuid.hidden = type.value !== "UUID";
+    }
+    type.addEventListener("change", syncUuidButton);
+
+    const entry = {
+      el: row,
+      source,
+      read: () => {
+        const out = { ...source };
+        out.name = name.value.trim();
+        out.type = type.value;
+        const ex = parseFieldExample(example.value);
+        if (ex == null) delete out.example;
+        else out.example = ex;
+        return out;
+      },
+    };
+
+    remove.addEventListener("click", () => {
+      const i = rows.indexOf(entry);
+      if (i >= 0) rows.splice(i, 1);
+      row.remove();
+    });
+
+    if (initial) {
+      if (initial.name) name.value = initial.name;
+      if (initial.type) type.value = initial.type;
+      example.value = fieldExampleText(initial.example);
+    }
+    syncUuidButton();
+
+    rows.push(entry);
+    rowsEl.appendChild(row);
+  }
+
+  function collectSpecFields(rows) {
+    return rows
+      .map((r) => r.read())
+      .filter((f) => f.name !== "");
+  }
+
+  function buildSpecEditor(initial, opts) {
+    const section = document.createElement("div");
+    section.className = "form-row spec-editor";
+
+    const noteRow = document.createElement("label");
+    noteRow.className = "form-row";
+    const noteLabel = document.createElement("span");
+    noteLabel.className = "form-label";
+    noteLabel.textContent = "Description";
+    const note = document.createElement("textarea");
+    note.className = "form-input spec-notes";
+    note.rows = 3;
+    note.value = commentText(initial && initial.comments);
+    noteRow.append(noteLabel, note);
+    section.appendChild(noteRow);
+
+    const linkable = Array.isArray(opts.specElements) ? opts.specElements : [];
+    const byId = new Map(linkable.map((el) => [el.id, el]));
+    const groups = {};
+
+    function linkedForStep(step) {
+      return step && step.linkedId ? byId.get(step.linkedId) : null;
+    }
+
+    function linkableForGroup(key) {
+      if (key === "given") return linkable.filter((el) => el.kind === "EVENT");
+      if (key === "when") return linkable.filter((el) => el.kind === "COMMAND");
+      return linkable;
+    }
+
+    function addStepRow(key, initialStep) {
+      const rows = groups[key].rows;
+      const linked = linkedForStep(initialStep);
+      const isThen = key === "then";
+      const options = linkableForGroup(key);
+      const source = initialStep ? cloneJson(initialStep) : {};
+      const item = document.createElement("div");
+      item.className = "spec-step-editor";
+
+      const head = document.createElement("div");
+      head.className = "spec-step-head";
+
+      const select = selectEl(["", ...options.map((el) => el.id)]);
+      select.classList.add("spec-step-select");
+      select.options[0].textContent = options.length ? "Choose element" : "No matching elements";
+      select.options[0].value = "";
+      for (let i = 0; i < options.length; i++) {
+        select.options[i + 1].textContent = optionLabel(options[i]);
+      }
+      if (linked && options.includes(linked)) {
+        select.value = linked.id;
+      }
+
+      const errorToggle = document.createElement("label");
+      errorToggle.className = "spec-error-toggle";
+      const errorCheck = document.createElement("input");
+      errorCheck.type = "checkbox";
+      errorCheck.checked = !!(isThen && initialStep && initialStep.type === "SPEC_ERROR");
+      errorToggle.append(errorCheck, document.createTextNode("expect error"));
+
+      const title = document.createElement("input");
+      title.type = "text";
+      title.className = "form-input spec-step-title";
+      title.placeholder = errorCheck.checked ? "Error title (optional)" : "Step title";
+      title.value = initialStep && initialStep.title ? initialStep.title : "";
+
+      const moveUp = document.createElement("button");
+      moveUp.type = "button";
+      moveUp.className = "spec-step-btn";
+      moveUp.title = "Move step up";
+      moveUp.textContent = "↑";
+
+      const moveDown = document.createElement("button");
+      moveDown.type = "button";
+      moveDown.className = "spec-step-btn";
+      moveDown.title = "Move step down";
+      moveDown.textContent = "↓";
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "field-remove";
+      remove.title = "Remove step";
+      remove.textContent = "×";
+
+      if (isThen) head.append(errorToggle);
+      head.append(select, title, moveUp, moveDown, remove);
+      item.appendChild(head);
+
+      const fieldsEl = document.createElement("div");
+      fieldsEl.className = "spec-field-rows";
+      item.appendChild(fieldsEl);
+      const fieldRows = [];
+
+      const fieldActions = document.createElement("div");
+      fieldActions.className = "spec-field-actions";
+      const addField = document.createElement("button");
+      addField.type = "button";
+      addField.className = "add-field-btn";
+      addField.textContent = "+ field";
+      addField.addEventListener("click", () => addSpecFieldRow(fieldsEl, fieldRows));
+      fieldActions.appendChild(addField);
+      item.appendChild(fieldActions);
+
+      const entry = {
+        el: item,
+        source,
+        fieldRows,
+        read: () => {
+          const selected = byId.get(select.value) || null;
+          const expectError = isThen && errorCheck.checked;
+          const out = { ...source };
+          out.id = out.id || genId();
+          out.title = title.value.trim() || (expectError ? "Expected error" : (selected && selected.title) || "");
+          out.type = expectError ? "SPEC_ERROR" : (selected ? SPEC_STEP_TYPE[selected.kind] : out.type);
+          if (expectError) {
+            delete out.linkedId;
+            delete out.fields;
+            return out;
+          }
+          if (selected) out.linkedId = selected.id;
+          else if (select.value || out.linkedId) out.linkedId = select.value || out.linkedId;
+          else delete out.linkedId;
+          const fields = collectSpecFields(fieldRows);
+          if (fields.length) out.fields = fields;
+          else delete out.fields;
+          return out;
+        },
+      };
+
+      function reseedFields(fields) {
+        fieldRows.splice(0, fieldRows.length);
+        fieldsEl.innerHTML = "";
+        for (const f of (Array.isArray(fields) ? fields : [])) {
+          if (f && f.name) addSpecFieldRow(fieldsEl, fieldRows, f);
+        }
+      }
+
+      function syncErrorMode() {
+        const on = isThen && errorCheck.checked;
+        select.hidden = on;
+        fieldsEl.hidden = on;
+        fieldActions.hidden = on;
+        title.placeholder = on ? "Error title (optional)" : "Step title";
+        item.classList.toggle("is-error-step", on);
+      }
+
+      select.addEventListener("change", () => {
+        const selected = byId.get(select.value);
+        if (!selected) return;
+        title.value = selected.title || "";
+        reseedFields(selected.fields);
+      });
+      errorCheck.addEventListener("change", syncErrorMode);
+
+      moveUp.addEventListener("click", () => {
+        const i = rows.indexOf(entry);
+        if (i <= 0) return;
+        rows.splice(i, 1);
+        rows.splice(i - 1, 0, entry);
+        groups[key].rowsEl.insertBefore(item, groups[key].rowsEl.children[i - 1]);
+      });
+      moveDown.addEventListener("click", () => {
+        const i = rows.indexOf(entry);
+        if (i < 0 || i >= rows.length - 1) return;
+        rows.splice(i, 1);
+        rows.splice(i + 1, 0, entry);
+        groups[key].rowsEl.insertBefore(groups[key].rowsEl.children[i + 1], item);
+      });
+      remove.addEventListener("click", () => {
+        const i = rows.indexOf(entry);
+        if (i >= 0) rows.splice(i, 1);
+        item.remove();
+      });
+
+      rows.push(entry);
+      groups[key].rowsEl.appendChild(item);
+      reseedFields(initialStep && Array.isArray(initialStep.fields)
+        ? initialStep.fields
+        : (linked && linked.fields));
+      syncErrorMode();
+    }
+
+    for (const [label, key] of [["Given", "given"], ["When", "when"], ["Then", "then"]]) {
+      const group = document.createElement("div");
+      group.className = "spec-gwt-group";
+      const head = document.createElement("div");
+      head.className = "spec-gwt-head";
+      const lbl = document.createElement("span");
+      lbl.className = "form-label";
+      lbl.textContent = label;
+      const add = document.createElement("button");
+      add.type = "button";
+      add.className = "add-field-btn";
+      add.textContent = "+ Add " + label;
+      head.append(lbl, add);
+      const rowsEl = document.createElement("div");
+      rowsEl.className = "spec-step-rows";
+      group.append(head, rowsEl);
+      section.appendChild(group);
+      groups[key] = { rows: [], rowsEl };
+      add.addEventListener("click", () => addStepRow(key));
+      for (const step of (initial && Array.isArray(initial[key]) ? initial[key] : [])) {
+        addStepRow(key, step);
+      }
+    }
+
+    return {
+      section,
+      read: () => ({
+        comments: commentsFromText(note.value),
+        linkedId: opts.sliceId || (initial && initial.linkedId) || "",
+        given: groups.given.rows.map((r) => r.read()).filter((s) => s.title && s.type),
+        when: groups.when.rows.map((r) => r.read()).filter((s) => s.title && s.type),
+        then: groups.then.rows.map((r) => r.read()).filter((s) => s.title && s.type),
+      }),
+    };
+  }
+
   // ---------- Modal controller ----------
 
   const backdrop = document.getElementById("formBackdrop");
@@ -623,6 +981,16 @@
         row.appendChild(el);
       }
       bodyEl.appendChild(row);
+    }
+
+    if (type === "specification") {
+      const specEditor = buildSpecEditor(initial, opts);
+      bodyEl.appendChild(specEditor.section);
+      readers.comments = () => specEditor.read().comments;
+      readers.linkedId = () => specEditor.read().linkedId;
+      readers.given = () => specEditor.read().given;
+      readers.when = () => specEditor.read().when;
+      readers.then = () => specEditor.read().then;
     }
 
     // Read models can attach event dependencies drawn from the whole model.

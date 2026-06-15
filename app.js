@@ -249,11 +249,24 @@
     return s.length > 32 ? s.slice(0, 31) + "…" : s;
   }
 
+  function shortUuidText(value) {
+    const s = String(value || "");
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)) return null;
+    return JSON.stringify(s.slice(0, 8) + "..." + s.slice(-6));
+  }
+
+  function fieldExampleText(f, opts) {
+    if (opts && opts.shortenUuid && f && f.type === "UUID" && typeof f.example === "string") {
+      return shortUuidText(f.example) || exampleText(f.example);
+    }
+    return exampleText(f && f.example);
+  }
+
   // One field line: name, type, flag badges, and example value when present.
   // When the field carries `subfields` (a nested object), a disclosure toggle is
   // prepended and the subfields render as a collapsible, indented nested list —
   // recursively, so each deeper Custom field gets its own toggle.
-  function fieldLine(f) {
+  function fieldLine(f, opts) {
     const li = document.createElement("li");
     if (!f || typeof f !== "object") {
       li.textContent = "?";
@@ -303,7 +316,7 @@
       head.appendChild(b);
     }
 
-    const ex = exampleText(f.example);
+    const ex = fieldExampleText(f, opts);
     if (ex != null) {
       const e = document.createElement("span");
       e.className = "f-ex";
@@ -318,7 +331,7 @@
     li.appendChild(head);
     const sub = document.createElement("ul");
     sub.className = "card-fields card-subfields";
-    for (const s of subfields) sub.appendChild(fieldLine(s));
+    for (const s of subfields) sub.appendChild(fieldLine(s, opts));
     li.appendChild(sub);
 
     toggle.addEventListener("click", (e) => {
@@ -339,11 +352,11 @@
   // signature is in it is marked `.f-redundant` so CSS can hide it — used by
   // events to suppress fields identical to ones already shown on the slice's
   // commands.
-  function fieldList(fields, redundant) {
+  function fieldList(fields, redundant, opts) {
     const ul = document.createElement("ul");
     ul.className = "card-fields";
     for (const f of asArray(fields)) {
-      const li = fieldLine(f);
+      const li = fieldLine(f, opts);
       if (redundant && f && typeof f === "object" && f.name != null && redundant.has(fieldSig(f))) {
         li.classList.add("f-redundant");
       }
@@ -367,6 +380,14 @@
     const text = String(item.description).trim();
     if (!text) return null;
     return text;
+  }
+
+  function specCommentText(spec) {
+    const text = asArray(spec && spec.comments)
+      .map((c) => c && c.description != null ? String(c.description).trim() : "")
+      .filter(Boolean)
+      .join("\n\n");
+    return text || null;
   }
 
   function descriptionEl(item) {
@@ -415,22 +436,53 @@
   // A specification card: each given/when/then step with its fields inline.
   function specBody(spec) {
     const wrap = document.createDocumentFragment();
+    const comments = specCommentText(spec);
+    const hasSteps = ["given", "when", "then"].some((key) => asArray(spec && spec[key]).length > 0);
+    if (!comments && !hasSteps) {
+      const note = document.createElement("div");
+      note.className = "card-description spec-undefined";
+      note.textContent = "not yet defined";
+      wrap.appendChild(note);
+      return wrap;
+    }
+    if (comments) {
+      const desc = document.createElement("div");
+      desc.className = "card-description";
+      desc.textContent = comments;
+      wrap.appendChild(desc);
+    }
     for (const [label, key] of [["Given", "given"], ["When", "when"], ["Then", "then"]]) {
       const steps = asArray(spec[key]);
-      if (steps.length === 0) continue;
+      if (steps.length === 0 && key !== "given") continue;
       const group = document.createElement("div");
       group.className = "spec-group";
       const lbl = document.createElement("div");
       lbl.className = "spec-label";
       lbl.textContent = label;
       group.appendChild(lbl);
+      if (steps.length === 0) {
+        const st = document.createElement("div");
+        st.className = "spec-step spec-step-empty";
+        st.textContent = "Nothing";
+        group.appendChild(st);
+        wrap.appendChild(group);
+        continue;
+      }
       for (const step of steps) {
         const st = document.createElement("div");
         st.className = "spec-step";
-        st.textContent = step && step.title != null ? String(step.title) : "?";
+        if (step && step.type === "SPEC_ERROR") {
+          const badge = document.createElement("span");
+          badge.className = "spec-error-badge";
+          badge.textContent = "Error";
+          st.appendChild(badge);
+          st.appendChild(document.createTextNode(" " + (step.title != null ? String(step.title) : "?")));
+        } else {
+          st.textContent = step && step.title != null ? String(step.title) : "?";
+        }
         group.appendChild(st);
         const fields = asArray(step && step.fields);
-        if (fields.length) group.appendChild(fieldList(fields));
+        if (fields.length) group.appendChild(fieldList(fields, null, { shortenUuid: true }));
       }
       wrap.appendChild(group);
     }
@@ -640,6 +692,15 @@
       const imgs = screenImagesSection(detailCtx);
       if (imgs) modalBody.appendChild(imgs);
       detailItem = withoutKeys(detailItem, ["description"]);
+    } else if (type === "specification") {
+      const comments = specCommentText(item);
+      if (comments) {
+        const desc = document.createElement("div");
+        desc.className = "modal-screen-description";
+        desc.textContent = comments;
+        modalBody.appendChild(desc);
+      }
+      detailItem = withoutKeys(detailItem, ["comments"]);
     }
     modalBody.appendChild(renderValue(detailItem));
     if (modalFoot) modalFoot.hidden = !detailCtx;
@@ -1029,6 +1090,27 @@
     return out;
   }
 
+  function specElements(model) {
+    const out = [];
+    for (const s of (Array.isArray(model && model.slices) ? model.slices : [])) {
+      for (const key of ["commands", "events", "readmodels"]) {
+        for (const el of (s && Array.isArray(s[key]) ? s[key] : [])) {
+          if (el && el.id && SPEC_STEP_KIND.has(el.type)) {
+            out.push({
+              id: el.id,
+              title: el.title || el.id,
+              kind: el.type,
+              fields: asArray(el.fields),
+            });
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  const SPEC_STEP_KIND = new Set(["COMMAND", "EVENT", "READMODEL"]);
+
   // Copy-fields / dependency options for a form, shared by add and edit. Commands
   // pull their (non-generated) fields from the slice's event. Read models attach
   // model-wide events as INBOUND dependencies and copy a chosen event's fields.
@@ -1053,6 +1135,11 @@
     } else if (type === "processor") {
       const fields = fieldsFromElements(slice && slice.commands);
       if (fields.length) return { copyFromFields: fields, copyFromLabel: "Copy fields from command" };
+    } else if (type === "specification") {
+      return {
+        specElements: specElements(model),
+        sliceId: slice && slice.id ? slice.id : "",
+      };
     }
     return null;
   }
@@ -1766,6 +1853,40 @@
     return out;
   }
 
+  function specFieldSig(path, field) {
+    return path + "\0" + (field && field.type != null ? String(field.type) : "");
+  }
+
+  function specificationFieldFindings(model, entries) {
+    const byId = new Map(entries.map(({ el }) => [el.id, el]));
+    const findings = [];
+    const slices = Array.isArray(model && model.slices) ? model.slices : [];
+    for (const slice of slices) {
+      for (const spec of asArray(slice && slice.specifications)) {
+        if (!spec || !spec.id) continue;
+        const specTitle = spec.title != null && spec.title !== "" ? String(spec.title) : "(untitled)";
+        for (const [label, key] of [["Given", "given"], ["When", "when"], ["Then", "then"]]) {
+          for (const step of asArray(spec[key])) {
+            if (!step || step.type === "SPEC_ERROR" || !step.linkedId) continue;
+            const linked = byId.get(step.linkedId);
+            if (!linked) continue;
+            const linkedFields = new Set(leafFields(linked.fields).map(({ field, path }) => specFieldSig(path, field)));
+            const stepTitle = step.title != null && step.title !== "" ? String(step.title) : "(untitled)";
+            for (const { field, path } of leafFields(step.fields)) {
+              if (linkedFields.has(specFieldSig(path, field))) continue;
+              const linkedTitle = linked.title != null && linked.title !== "" ? String(linked.title) : linked.id;
+              findings.push({
+                kind: "warning", locLabel: "spec", elementId: spec.id,
+                msg: `Specification '${specTitle}': ${label} step '${stepTitle}' field '${path}' does not exist on linked ${linked.type} '${linkedTitle}'.`,
+              });
+            }
+          }
+        }
+      }
+    }
+    return findings;
+  }
+
   // One finding per unsourced consumer leaf field, plus a lower-severity finding
   // per leaf whose name matches an upstream field but whose type drifts.
   // `generated` fields are system-produced and exempt (mirrors eventFieldsOf's
@@ -1823,6 +1944,7 @@
         }
       }
     }
+    findings.push(...specificationFieldFindings(model, entries));
     return findings;
   }
 

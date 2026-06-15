@@ -448,6 +448,10 @@ svg.flow-lines {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+.card .card-description.spec-undefined {
+  color: var(--fg-faint);
+  font-style: italic;
+}
 .card .card-fields {
   list-style: none;
   margin: 4px 0 0;
@@ -527,6 +531,18 @@ svg.flow-lines {
   color: var(--fg-dim);
   font-weight: 600;
   margin-top: 2px;
+}
+.card .spec-group .spec-step-empty {
+  color: var(--fg-faint);
+  font-style: italic;
+}
+.card .spec-group .spec-error-badge {
+  color: var(--err);
+  background: color-mix(in srgb, var(--err) 12%, transparent);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 9.5px;
+  text-transform: uppercase;
 }
 .card .spec-group .card-fields { margin: 1px 0 2px 8px; }
 
@@ -1196,3 +1212,123 @@ input[type="checkbox"].form-input {
   white-space: nowrap;
 }
 .dep-option:hover { background: var(--btn-hover); }
+
+/* ---------- Specification editor ---------- */
+.spec-editor {
+  gap: 14px;
+  padding-top: 2px;
+}
+.spec-notes {
+  min-height: 72px;
+  resize: vertical;
+}
+.spec-gwt-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-top: 2px;
+}
+.spec-gwt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.spec-step-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.spec-step-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 72%, var(--bg));
+}
+.spec-step-head,
+.spec-field-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.spec-step-select {
+  flex: 0 0 190px;
+  min-width: 0;
+}
+.spec-step-select[hidden],
+.spec-field-rows[hidden] {
+  display: none;
+}
+.spec-error-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.spec-error-toggle input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+.spec-step-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.spec-step-btn {
+  flex: 0 0 auto;
+  background: var(--line);
+  color: var(--fg);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px 7px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.spec-step-btn:hover { background: var(--btn-hover); }
+.spec-field-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+}
+.spec-field-actions {
+  margin-left: 20px;
+}
+.spec-field-actions[hidden] { display: none; }
+.spec-field-row .form-input {
+  padding: 5px 7px;
+  font-size: 12.5px;
+}
+.spec-field-name {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.spec-field-type { flex: 0 0 110px; }
+.spec-field-example {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.spec-example-btn {
+  flex: 0 0 auto;
+  background: var(--line);
+  color: var(--fg);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 5px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.spec-example-btn:hover { background: var(--btn-hover); }
+.spec-example-btn[hidden] { display: none; }
