@@ -291,6 +291,17 @@ body.editor-hidden .pane-toggle { left: 4px; }
 #input:focus { outline: none; }
 
 /* ---------- Preview pane ---------- */
+/* Positioned, non-scrolling shell around the preview. Anchors the floating
+   action dock to the bottom-left of the visualizer so it stays put while the
+   slice canvas inside .preview scrolls. */
+.preview-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
 .preview {
   /* Grows to fill all the horizontal space the editor doesn't claim. The editor
      is sized to its text, so the preview gets everything else. */
@@ -300,11 +311,10 @@ body.editor-hidden .pane-toggle { left: 4px; }
   overflow: auto;
   background: var(--bg-elev);
   border-left: 1px solid var(--line);
-  /* No top OR left padding: the sticky .preview-toolbar must cover from the true
-     top-left of the scrollport. Padding here would sit outside the toolbar's
-     masking background once scrolled, letting card content peek through (top
-     edge, and the left strip when the canvas is scrolled horizontally). The
-     left inset for the slice canvas lives in .preview-row's padding instead. */
+  /* No left padding so the sticky slice headers mask from the true left edge; the
+     left inset for the slice canvas lives in .preview-row's padding instead. The
+     top gap above the slice titles lives in .slice-header's padding-top so the
+     sticky headers don't drift before they pin. */
   padding: 0 14px 14px 0;
 }
 
@@ -751,33 +761,23 @@ svg.flow-lines {
 .detail-array > li + li { border-top: 1px dashed var(--line); }
 
 /* ---------- Add controls ---------- */
-/* Pinned to the top-left of the scrolling preview so the edit toggle and the
-   "+ Add Slice" button stay in reach no matter how far the slice canvas is
-   scrolled. Negative side margins let the strip span the preview's horizontal
-   padding so its background masks content at the left/right edges. Top margin
-   is 0 (and .preview has no top padding) so the strip's background covers the
-   scrollport from y=0 with no uncovered gap once scrolled. No bottom margin:
-   the gap to the slice titles lives in .slice-header's padding-top instead, so
-   the sticky headers don't drift before pinning. Sticks on both axes. */
+/* Floating action dock: the edit toggle and "+ Add Slice" button hover over the
+   bottom-left of the visualizer. Anchored to .preview-wrap (not the scrolling
+   .preview) so they stay in reach no matter how the slice canvas is scrolled,
+   while reclaiming the vertical strip they used to occupy at the top. */
 .preview-toolbar {
-  position: sticky;
-  top: 0;
-  left: 0;
-  z-index: 4;
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 6;
   display: flex;
   align-items: center;
   gap: 8px;
-  /* Only the RIGHT margin bleeds negative (over the preview's right padding). No
-     negative LEFT margin: combined with sticky left:0 it would shift the masking
-     background inward when the canvas is scrolled, uncovering a left strip where
-     scrolled cards/arrows peek through. The toolbar starts at the preview's true
-     left edge (which has no padding) and sticks there, masking the full width. */
-  margin: 0 -14px 0 0;
-  /* Top padding is the gap between the app topbar and the buttons. It lives in
-     the toolbar's own padding (not preview top padding) so the background still
-     masks from y=0 once scrolled. */
-  padding: 14px 8px 2px;
+  padding: 6px;
+  border-radius: 8px;
   background: var(--bg-elev);
+  border: 1px solid var(--line);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
 /* Edit toggle pinned to the top-left of the toolbar: shows/hides the JSON
@@ -844,22 +844,22 @@ summary.add-btn::marker { content: ""; }
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  /* Keep the slice name + action buttons pinned while the lanes scroll
-     vertically beneath them. Pinned just below the sticky .preview-toolbar
-     strip (top:0, z-index:4) so it stays visible instead of sliding behind it.
-     The opaque background + z-index let card content (and the flow-line overlay
-     at z-index 1) pass behind the header. */
+  /* Keep the slice name + action buttons pinned to the top of the scrollport
+     while the lanes scroll vertically beneath them. The opaque background +
+     z-index let card content (and the flow-line overlay at z-index 1) pass
+     behind the header. */
   position: sticky;
-  top: 40px;
+  top: 0;
   z-index: 2;
   background: var(--bg-elev);
-  /* Breathing room to the toolbar lives here (not the toolbar's bottom margin)
-     so the header barely travels before it pins. Because the header background
-     matches the preview, this top padding reads as the gap above the slice
-     titles. top:40 keeps its top edge just under the ~43px toolbar so the
-     overlap masks any card peeking between them. */
-  padding-top: 30px;
+  /* Reads as the gap above the slice titles at the default scroll position. */
+  padding-top: 14px;
 }
+/* The .slice-column gap (46px, sized for the flow-line arcs between lanes) also
+   lands between the header and the first lane, leaving a wide blank strip under
+   the header. Pull the first lane up so the screens/automation row sits closer
+   to the title. */
+.slice-header + .lane { margin-top: -28px; }
 .slice-head-main {
   min-width: 0;
   flex: 1 1 100%;

@@ -1046,7 +1046,8 @@
   // to hidden on reload.
 
   let editorHidden = true;
-  let editToggleBtn = null; // the pencil button in the most recently rendered toolbar
+  const editToggleBtn = document.getElementById("editToggleBtn"); // pencil in the floating dock
+  const addSliceBtn = document.getElementById("addSliceBtn"); // "+ Add Slice" in the floating dock
   const paneToggle = document.getElementById("paneToggle"); // collapse handle on the divider
 
   function svg(path) {
@@ -1099,34 +1100,26 @@
     paneToggle.addEventListener("click", () => setEditorHidden(!editorHidden));
   }
 
+  // The floating action dock lives outside the scrolling preview, so its buttons
+  // are wired once here rather than rebuilt on every render.
+  if (editToggleBtn) {
+    editToggleBtn.innerHTML = EDIT_ICON;
+    editToggleBtn.addEventListener("click", () => setEditorHidden(!editorHidden));
+    updateEditToggleBtn();
+  }
+  if (addSliceBtn) {
+    addSliceBtn.addEventListener("click", () => startAdd("slice", null, null));
+  }
+
   // Full-width visualizer is the default view.
   document.body.classList.add("editor-hidden");
   updatePaneToggle();
 
   function renderModel(parsed) {
+    // The edit toggle + "+ Add Slice" buttons live in the floating dock outside
+    // this scrolling pane (always available, even for an empty document), so the
+    // render only rebuilds the slice canvas.
     preview.innerHTML = "";
-
-    // Always offer a global "Add Slice" so an empty document can be bootstrapped.
-    const toolbar = document.createElement("div");
-    toolbar.className = "preview-toolbar";
-
-    // Edit toggle pinned to the top-left corner: shows/hides the JSON editor.
-    editToggleBtn = document.createElement("button");
-    editToggleBtn.type = "button";
-    editToggleBtn.className = "edit-toggle-btn";
-    editToggleBtn.innerHTML = EDIT_ICON;
-    editToggleBtn.addEventListener("click", () => setEditorHidden(!editorHidden));
-    updateEditToggleBtn();
-    toolbar.appendChild(editToggleBtn);
-
-    const addSliceBtn = document.createElement("button");
-    addSliceBtn.type = "button";
-    addSliceBtn.className = "add-btn";
-    addSliceBtn.textContent = "+ Add Slice";
-    addSliceBtn.addEventListener("click", () => startAdd("slice", null, null));
-    toolbar.appendChild(addSliceBtn);
-
-    preview.appendChild(toolbar);
 
     const slices = parsed && Array.isArray(parsed.slices) ? parsed.slices : null;
     if (!slices || slices.length === 0) {
