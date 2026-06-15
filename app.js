@@ -5,10 +5,14 @@
   const highlight = document.getElementById("highlight");
   const gutter = document.getElementById("gutter");
   const statusbar = document.getElementById("statusbar");
-  const statusText = document.getElementById("statusText");
-  const statusMeta = document.getElementById("statusMeta");
+  const modelStatusText = document.getElementById("modelStatusText");
+  const editorStatus = document.getElementById("editorStatus");
+  const editorStatusText = document.getElementById("editorStatusText");
+  const editorStatusMeta = document.getElementById("editorStatusMeta");
   const problems = document.getElementById("problems");
   const problemsList = document.getElementById("problemsList");
+  const editorProblems = document.getElementById("editorProblems");
+  const editorProblemsList = document.getElementById("editorProblemsList");
   const formatBtn = document.getElementById("formatBtn");
   const downloadBtn = document.getElementById("downloadBtn");
   const themeToggle = document.getElementById("themeToggle");
@@ -1214,16 +1218,24 @@
     drawFlowLines();
   }
 
-  function setStatus(state, text, meta) {
-    statusbar.className = "statusbar" + (state ? " " + state : "");
-    statusText.textContent = text;
-    statusMeta.textContent = meta || "";
+  // Editor-scoped bar: JSON syntax + schema errors. state "" hides the bar.
+  function setEditorStatus(state, text, meta) {
+    editorStatus.hidden = !state;
+    editorStatus.className = "statusbar editor-status" + (state ? " " + state : "");
+    editorStatusText.textContent = text || "";
+    editorStatusMeta.textContent = meta || "";
   }
 
-  function showProblems(items) {
-    problemsList.innerHTML = "";
+  // Single model-status indicator in the footer bottom-right.
+  function setModelStatus(state, text) {
+    statusbar.className = "statusbar" + (state ? " " + state : "");
+    modelStatusText.textContent = text;
+  }
+
+  function renderProblems(sectionEl, listEl, items) {
+    listEl.innerHTML = "";
     if (items.length === 0) {
-      problems.hidden = true;
+      sectionEl.hidden = true;
       return;
     }
     for (const it of items) {
@@ -1252,9 +1264,19 @@
           syncScroll();
         });
       }
-      problemsList.appendChild(li);
+      listEl.appendChild(li);
     }
-    problems.hidden = false;
+    sectionEl.hidden = false;
+  }
+
+  // Editor-scoped list: JSON syntax + schema errors.
+  function showEditorProblems(items) {
+    renderProblems(editorProblems, editorProblemsList, items);
+  }
+
+  // Global list: information-completeness warnings only.
+  function showProblems(items) {
+    renderProblems(problems, problemsList, items);
   }
 
   // ---------- Information completeness ----------
@@ -1724,9 +1746,11 @@
     setSchemaValid(false);
 
     if (text.trim() === "") {
-      setStatus("", "Empty", "");
+      setEditorStatus("");
+      setModelStatus("", "No model");
       renderGutter(text, errorLines);
       renderHighlight(text, errorLines);
+      showEditorProblems([]);
       showProblems([]);
       renderModel(null);
       return;
@@ -1748,8 +1772,10 @@
 
       renderGutter(text, errorLines);
       renderHighlight(text, errorLines);
-      setStatus("err", "Invalid JSON", `Ln ${line}, Col ${col}`);
-      showProblems([{ line, col, offset, msg: clean }]);
+      setEditorStatus("err", "Invalid JSON", `Ln ${line}, Col ${col}`);
+      showEditorProblems([{ line, col, offset, msg: clean }]);
+      setModelStatus("err", "Invalid JSON");
+      showProblems([]);
       return;
     }
 
@@ -1777,19 +1803,24 @@
     renderHighlight(text, errorLines);
 
     if (schemaErrors.length) {
-      setStatus("err", "Schema errors", `${schemaErrors.length} problem${schemaErrors.length > 1 ? "s" : ""}`);
-      showProblems(schemaErrors.slice(0, 200).map((e) => ({ path: e.path || "(root)", msg: e.msg })));
+      setEditorStatus("err", "Schema errors", `${schemaErrors.length} problem${schemaErrors.length > 1 ? "s" : ""}`);
+      showEditorProblems(schemaErrors.slice(0, 200).map((e) => ({ path: e.path || "(root)", msg: e.msg })));
+      setModelStatus("err", "Schema errors");
+      showProblems([]);
       return;
     }
 
-    // Schema-valid: completeness warnings never block — the model is still
-    // "Valid" and saves/exports, so the Download button is enabled here.
+    // Schema-valid: no editor-level errors, so the editor bar is hidden.
+    // Completeness warnings never block — the model is still valid and
+    // saves/exports, so the Download button is enabled here.
+    setEditorStatus("");
+    showEditorProblems([]);
     setSchemaValid(true);
     if (completenessWarnings.length) {
       const n = completenessWarnings.length;
-      setStatus("ok", "Valid", `${n} completeness warning${n > 1 ? "s" : ""}`);
+      setModelStatus("warn", `${n} completeness warning${n > 1 ? "s" : ""}`);
     } else {
-      setStatus("ok", "Valid", "JSON + schema OK");
+      setModelStatus("ok", "Model complete");
     }
     showProblems(completenessWarnings);
   }

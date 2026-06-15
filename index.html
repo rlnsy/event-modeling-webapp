@@ -25,15 +25,25 @@
 
   <main class="editor-wrap">
     <div class="editor" id="editor">
-      <div class="gutter" id="gutter" aria-hidden="true"></div>
-      <div class="input-stack">
-        <button id="formatBtn" type="button" class="editor-format"
-          title="Pretty-print (Ctrl/Cmd+S)">Format</button>
-        <pre class="highlight" id="highlight" aria-hidden="true"></pre>
-        <textarea id="input" spellcheck="false" autocomplete="off"
-          autocapitalize="off" wrap="off"
-          placeholder="Paste or write JSON here&hellip;"></textarea>
+      <div class="editor-body">
+        <div class="gutter" id="gutter" aria-hidden="true"></div>
+        <div class="input-stack">
+          <button id="formatBtn" type="button" class="editor-format"
+            title="Pretty-print (Ctrl/Cmd+S)">Format</button>
+          <pre class="highlight" id="highlight" aria-hidden="true"></pre>
+          <textarea id="input" spellcheck="false" autocomplete="off"
+            autocapitalize="off" wrap="off"
+            placeholder="Paste or write JSON here&hellip;"></textarea>
+        </div>
       </div>
+      <div class="statusbar editor-status" id="editorStatus" hidden>
+        <span class="status-dot"></span>
+        <span class="status-text" id="editorStatusText"></span>
+        <span class="status-meta" id="editorStatusMeta"></span>
+      </div>
+      <section class="problems editor-problems" id="editorProblems" hidden>
+        <ul id="editorProblemsList"></ul>
+      </section>
     </div>
     <div class="pane-rail" aria-hidden="false">
       <button class="pane-toggle" id="paneToggle" type="button"></button>
@@ -42,9 +52,10 @@
   </main>
 
   <footer class="statusbar" id="statusbar">
-    <span class="status-dot" id="statusDot"></span>
-    <span class="status-text" id="statusText">Empty</span>
-    <span class="status-meta" id="statusMeta"></span>
+    <span class="model-status" id="modelStatus">
+      <span class="status-dot"></span>
+      <span class="status-text" id="modelStatusText">No model</span>
+    </span>
   </footer>
 
   <section class="problems" id="problems" hidden>

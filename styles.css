@@ -184,6 +184,9 @@ body.editor-hidden .pane-toggle { left: 4px; }
 
 .editor {
   display: flex;
+  /* Column so the editor-scoped status bar / problems list can stack below the
+     gutter+textarea row (which lives in .editor-body). */
+  flex-direction: column;
   /* Width is set by JS to fit the longest line of JSON (see sizeEditor()); this
      is just the pre-script fallback. flex-grow stays 0 so the editor never eats
      the leftover space — that goes to the preview. */
@@ -194,6 +197,18 @@ body.editor-hidden .pane-toggle { left: 4px; }
   overflow: hidden;
   background: var(--bg);
 }
+
+/* The horizontal gutter + textarea row; fills the editor column above the
+   editor-scoped status bar. */
+.editor-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Editor-scoped problems list stays compact so it never crowds the textarea. */
+.editor-problems { max-height: 30vh; }
 
 .gutter {
   flex: 0 0 auto;
@@ -575,10 +590,15 @@ svg.flow-lines {
 }
 .statusbar.ok   .status-dot { background: var(--ok); }
 .statusbar.err  .status-dot { background: var(--err); }
+.statusbar.warn .status-dot { background: var(--warn); }
 .statusbar.ok   .status-text { color: var(--ok); }
 .statusbar.err  .status-text { color: var(--err); }
+.statusbar.warn .status-text { color: var(--warn); }
 .status-text { font-weight: 600; }
 .status-meta { color: var(--fg-faint); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+/* Single model-status indicator pinned to the bottom-right of the footer. */
+.model-status { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 
 /* ---------- Problems panel ---------- */
 .problems {
