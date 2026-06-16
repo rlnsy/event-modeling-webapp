@@ -561,12 +561,6 @@
     const type = selectEl(FIELD_TYPES);
     type.classList.add("spec-field-type");
 
-    const mapping = document.createElement("input");
-    mapping.type = "text";
-    mapping.className = "form-input spec-field-mapping";
-    mapping.placeholder = "source";
-    mapping.title = "Linked element source field or path";
-
     const example = document.createElement("input");
     example.type = "text";
     example.className = "form-input spec-field-example";
@@ -587,7 +581,7 @@
     remove.title = "Remove field";
     remove.textContent = "×";
 
-    row.append(name, mapping, type, example, genUuid, remove);
+    row.append(name, type, example, genUuid, remove);
 
     function syncUuidButton() {
       genUuid.hidden = type.value !== "UUID";
@@ -599,8 +593,8 @@
       source,
       read: () => {
         const out = { ...source };
+        delete out.mapping;
         out.name = name.value.trim();
-        setOrDelete(out, "mapping", mapping.value.trim());
         out.type = type.value;
         const ex = parseFieldExample(example.value);
         if (ex == null) delete out.example;
@@ -617,7 +611,6 @@
 
     if (initial) {
       if (initial.name) name.value = initial.name;
-      if (initial.mapping) mapping.value = initial.mapping;
       if (initial.type) type.value = initial.type;
       example.value = fieldExampleText(initial.example);
     }
