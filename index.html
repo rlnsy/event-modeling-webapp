@@ -106,6 +106,28 @@
     </form>
   </div>
 
+  <dialog class="modal session-dialog" id="sessionDialog" aria-labelledby="sessionDialogTitle">
+    <form id="sessionDialogForm" method="dialog">
+      <header class="modal-head">
+        <span class="modal-title" id="sessionDialogTitle"></span>
+        <button class="modal-close" type="submit" value="cancel" formnovalidate
+          aria-label="Close">&times;</button>
+      </header>
+      <div class="modal-body form-body">
+        <p class="session-dialog-message" id="sessionDialogMessage" hidden></p>
+        <label class="form-row" id="sessionNameRow">
+          <span class="form-label">Name</span>
+          <input class="form-input" id="sessionNameInput" name="name" required />
+        </label>
+      </div>
+      <footer class="modal-foot">
+        <button type="submit" value="cancel" formnovalidate class="btn-secondary">Cancel</button>
+        <button type="submit" value="confirm" class="btn-primary"
+          id="sessionDialogSubmit"></button>
+      </footer>
+    </form>
+  </dialog>
+
   <div class="toast-region" id="toastRegion" aria-live="polite" aria-atomic="true"></div>
 
   <script src="schema.js"></script>

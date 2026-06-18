@@ -21,6 +21,13 @@
   const newSessionBtn = document.getElementById("newSessionBtn");
   const renameSessionBtn = document.getElementById("renameSessionBtn");
   const deleteSessionBtn = document.getElementById("deleteSessionBtn");
+  const sessionDialog = document.getElementById("sessionDialog");
+  const sessionDialogForm = document.getElementById("sessionDialogForm");
+  const sessionDialogTitle = document.getElementById("sessionDialogTitle");
+  const sessionDialogMessage = document.getElementById("sessionDialogMessage");
+  const sessionNameRow = document.getElementById("sessionNameRow");
+  const sessionNameInput = document.getElementById("sessionNameInput");
+  const sessionDialogSubmit = document.getElementById("sessionDialogSubmit");
   const preview = document.getElementById("preview");
   const editor = document.getElementById("editor");
   const modalBackdrop = document.getElementById("modalBackdrop");
@@ -2370,34 +2377,75 @@
     if (activeId) Sessions.update(activeId, input.value);
   }
 
+  let sessionDialogAction = null;
+
+  function openSessionDialog(action, session) {
+    sessionDialogAction = action;
+    const deleting = action === "delete";
+
+    sessionDialogTitle.textContent = {
+      create: "New session",
+      rename: "Rename session",
+      delete: "Delete session",
+    }[action];
+    sessionNameRow.hidden = deleting;
+    sessionNameInput.required = !deleting;
+    sessionNameInput.setCustomValidity("");
+    sessionNameInput.value = action === "create" ? "Untitled" : session?.name || "";
+    sessionDialogMessage.hidden = !deleting;
+    sessionDialogMessage.textContent = deleting
+      ? `Delete session "${session.name}"? This cannot be undone.`
+      : "";
+    sessionDialogSubmit.textContent = deleting ? "Delete" : action === "create" ? "Create" : "Rename";
+    sessionDialogSubmit.className = deleting ? "btn-danger" : "btn-primary";
+
+    sessionDialog.showModal();
+    if (!deleting) sessionNameInput.select();
+  }
+
   sessionSelect.addEventListener("change", () => loadSession(sessionSelect.value));
 
-  newSessionBtn.addEventListener("click", () => {
-    const name = window.prompt("Name for the new session:", "Untitled");
-    if (name === null) return; // cancelled
-    const s = Sessions.create(name, '{\n  "slices": []\n}');
-    loadSession(s.id);
-    input.focus();
-  });
+  newSessionBtn.addEventListener("click", () => openSessionDialog("create"));
 
   renameSessionBtn.addEventListener("click", () => {
     const current = Sessions.get(activeId);
-    if (!current) return;
-    const name = window.prompt("Rename session:", current.name);
-    if (name === null || name.trim() === "") return;
-    Sessions.rename(activeId, name);
-    refreshSessionSelect();
+    if (current) openSessionDialog("rename", current);
   });
 
   deleteSessionBtn.addEventListener("click", () => {
     const current = Sessions.get(activeId);
-    if (!current) return;
-    if (!window.confirm(`Delete session "${current.name}"? This cannot be undone.`)) return;
-    Sessions.remove(activeId);
-    // Always keep at least one session open.
-    const next = Sessions.ensureDefault();
-    loadSession(next.id);
+    if (current) openSessionDialog("delete", current);
   });
+
+  sessionDialogForm.addEventListener("submit", (event) => {
+    const submitter = event.submitter;
+    if (!submitter || submitter.value !== "confirm") return;
+    event.preventDefault();
+
+    const name = sessionNameInput.value.trim();
+    if (sessionDialogAction !== "delete" && !name) {
+      sessionNameInput.setCustomValidity("Enter a name.");
+      sessionNameInput.reportValidity();
+      return;
+    }
+
+    if (sessionDialogAction === "create") {
+      const session = Sessions.create(name, '{\n  "slices": []\n}');
+      loadSession(session.id);
+    } else if (sessionDialogAction === "rename") {
+      Sessions.rename(activeId, name);
+      refreshSessionSelect();
+    } else if (sessionDialogAction === "delete") {
+      Sessions.remove(activeId);
+      const next = Sessions.ensureDefault();
+      loadSession(next.id);
+    }
+
+    sessionDialog.close();
+    input.focus();
+  });
+
+  sessionNameInput.addEventListener("input", () => sessionNameInput.setCustomValidity(""));
 
   // ---------- Wiring ----------
 

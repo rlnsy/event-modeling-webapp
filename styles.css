@@ -826,6 +826,25 @@ svg.flow-lines {
   box-shadow: 0 12px 40px var(--shadow-strong);
   overflow: hidden;
 }
+
+.session-dialog {
+  padding: 0;
+  color: var(--fg);
+}
+.session-dialog:not([open]) { display: none; }
+.session-dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+.session-dialog form {
+  display: flex;
+  flex-direction: column;
+}
+.session-dialog-message {
+  margin: 0;
+  color: var(--fg);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+.session-dialog .form-row[hidden] { display: none; }
+.session-dialog .modal-foot { justify-content: flex-end; }
+
 .modal-head {
   display: flex;
   align-items: center;
