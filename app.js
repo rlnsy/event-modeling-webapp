@@ -775,9 +775,9 @@
   if (modalDeleteBtn) modalDeleteBtn.addEventListener("click", () => deleteComponent(detailCtx));
 
   // ---------- Keyboard navigation over the diagram (issue #10) ----------
-  // The preview is a row of slice columns, each a vertical stack of cards. Arrow
-  // keys / hjkl move the selection — vertically within a slice, horizontally
-  // between slices while preserving vertical position — and Space/Enter opens the
+  // Arrow keys / hjkl follow the visual rows within each slice, including
+  // side-by-side events. At a row boundary, horizontal movement crosses slices
+  // while preserving vertical position. Space/Enter opens the
   // selected card's detail modal. Selection is just a `.selected` class on a card.
   let selectedEl = null;
 
@@ -840,20 +840,38 @@
       for (const cards of cols) if (cards.length) { selectCard(cards[0]); return; }
       return;
     }
+    // A side-by-side lane is one visual row; ordinary lanes stack their cards.
+    const column = selectedEl.closest(".slice-column");
+    const rows = [...column.querySelectorAll(".lane")].flatMap((lane) => {
+      const cards = [...lane.querySelectorAll(".card")];
+      return lane.classList.contains("side-by-side") ? [cards] : cards.map((card) => [card]);
+    }).filter((row) => row.length);
+    const rowIndex = rows.findIndex((row) => row.includes(selectedEl));
+    const row = rows[rowIndex];
     if (dy !== 0) {
-      // Vertical: move within the current column, clamped to its ends (no wrap).
-      const cards = cols[state.col];
-      const next = state.row + dy;
-      if (next >= 0 && next < cards.length) selectCard(cards[next]);
-      else if (dy < 0 && state.row === 0) scrollCardFullyIntoView(cards[state.row]);
+      // Skip horizontal siblings and land nearest the current horizontal position.
+      const next = rows[rowIndex + dy];
+      if (next) {
+        const rect = selectedEl.getBoundingClientRect();
+        const x = (rect.left + rect.right) / 2;
+        let best = next[0], distance = Infinity;
+        for (const card of next) {
+          const r = card.getBoundingClientRect();
+          const d = Math.abs((r.left + r.right) / 2 - x);
+          if (d < distance) { best = card; distance = d; }
+        }
+        selectCard(best);
+      } else if (dy < 0 && rowIndex === 0) scrollCardFullyIntoView(selectedEl);
       return;
     }
+    const sibling = row[row.indexOf(selectedEl) + dx];
+    if (sibling) { selectCard(sibling); return; }
     // Horizontal: step to the next non-empty column, landing on the card whose
     // vertical position best matches the current one.
     const rect = selectedEl.getBoundingClientRect();
     const y = (rect.top + rect.bottom) / 2;
     for (let c = state.col + dx; c >= 0 && c < cols.length; c += dx) {
-      if (cols[c].length) { selectCard(nearestCard(cols[c], y)); return; }
+      if (cols[c].length) { selectCard(nearestCard(dx < 0 ? [...cols[c]].reverse() : cols[c], y)); return; }
     }
   }
 
