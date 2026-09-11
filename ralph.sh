@@ -33,7 +33,7 @@ for ((i = 1; i <= MAX_ITERATIONS; i++)); do
 
   codex exec \
     --approve-for-me \
-    --sandbox workspace-write \
+    --ephemeral \
     --output-last-message "$LAST_MESSAGE" \
     "$PROMPT"
 
