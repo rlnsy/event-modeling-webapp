@@ -1484,7 +1484,13 @@
         width = Math.max(width, Math.ceil(card.getBoundingClientRect().width));
       }
       for (const lane of col.querySelectorAll(".lane.side-by-side")) {
-        width = Math.max(width, Math.ceil(lane.scrollWidth));
+        // Centered overflow extends left of the lane, which scrollWidth omits.
+        // Measure the entire row so the first event stays inside the canvas.
+        const cards = [...lane.querySelectorAll(".card")];
+        const gap = pxNumber(getComputedStyle(lane).columnGap);
+        const rowWidth = cards.reduce((sum, card) => sum + card.getBoundingClientRect().width, 0) +
+          gap * Math.max(0, cards.length - 1);
+        width = Math.max(width, Math.ceil(rowWidth));
       }
       col.style.setProperty("--slice-width", width + "px");
     }

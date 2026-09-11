@@ -307,6 +307,8 @@ body.editor-hidden .pane-toggle { left: 4px; }
 }
 
 .preview {
+  --canvas-left-inset: 14px;
+  scroll-padding-left: var(--canvas-left-inset);
   /* Grows to fill all the horizontal space the editor doesn't claim. The editor
      is sized to its text, so the preview gets everything else. */
   flex: 1 1 auto;
@@ -331,7 +333,7 @@ body.editor-hidden .pane-toggle { left: 4px; }
   position: relative;
   /* Left inset for the slice canvas. Lives here (not on .preview) so the sticky
      toolbar can still mask from the preview's true left edge. */
-  padding-left: 14px;
+  padding-left: var(--canvas-left-inset);
 }
 
 /* Flow lines: an SVG overlay drawn over the slice row. Absolute + non-
@@ -957,7 +959,10 @@ body.editor-hidden .preview {
    slice content right so it clears the collapse handle at the window's edge.
    42px = the old 14px preview left padding (now removed) + 28px handle clearance,
    so the canvas sits exactly where it did before. */
-body.editor-hidden .preview-row,
+body.editor-hidden .preview {
+  --canvas-left-inset: 42px;
+}
+
 body.editor-hidden .preview-empty {
   padding-left: 42px;
 }
