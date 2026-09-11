@@ -1,0 +1,2 @@
+workspace = "test-workspace"
+url = "http://127.0.0.1:7777"
