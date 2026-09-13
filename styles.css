@@ -84,6 +84,7 @@ body {
 }
 
 .topbar h1 {
+  color: var(--accent);
   font-size: 15px;
   font-weight: 600;
   margin: 0;
