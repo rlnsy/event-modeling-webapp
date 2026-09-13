@@ -19,6 +19,7 @@ Requirements:
 - Run relevant tests, checks, builds, or linters.
 - Update task state using the skill.
 - Do not merge your branch to main.
+- Keep the app served at port 8777, in the background so it doesn't stop when this session stops. Restart it if needed.
 - If the current task is blocked, record that through the skill and exit this iteration.
 - If there are no actionable tasks remaining, output exactly:
 
