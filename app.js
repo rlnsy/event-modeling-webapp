@@ -474,6 +474,8 @@
     if (item && item.id && completenessFlags.has(item.id)) card.classList.add("has-gap");
     // Anchor for flow lines: lets the SVG overlay locate this card by element id.
     if (item && item.id != null) card.dataset.elId = String(item.id);
+    card.dataset.navTitle = title == null || title === "" ? "(untitled)" : String(title);
+    card.dataset.navType = TYPE_LABELS[type] || type;
     card.tabIndex = 0;
     card.setAttribute("role", "button");
     const t = document.createElement("div");
@@ -910,7 +912,7 @@
   }
 
   document.addEventListener("keydown", (e) => {
-    if (infoDialog.open) return;
+    if (infoDialog.open || modelNavigator.open) return;
     // Don't hijack typing or browser/editor shortcuts.
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const t = e.target;
@@ -928,6 +930,84 @@
     if (navKey(e)) return;
     // Reuse the card's own click wiring, which opens its detail modal.
     if ((e.key === " " || e.key === "Enter") && selectedEl) { e.preventDefault(); selectedEl.click(); }
+  });
+
+  // Search the rendered model so ordering and targets always match the canvas.
+  const modelNavigator = document.getElementById("modelNavigator");
+  const modelSearch = document.getElementById("modelSearch");
+  const modelSearchResults = document.getElementById("modelSearchResults");
+  const modelSearchCount = document.getElementById("modelSearchCount");
+
+  function renderModelSearch() {
+    const terms = modelSearch.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    const entries = [];
+    for (const [index, column] of [...preview.querySelectorAll(".slice-column")].entries()) {
+      const title = column.querySelector(".slice-title").textContent;
+      const context = `${index + 1}. ${title}`;
+      entries.push({ target: column, title, context: `Slice ${index + 1}`, type: "Slice", id: column.dataset.sliceId || "" });
+      for (const card of column.querySelectorAll(".card")) {
+        entries.push({ target: card, title: card.dataset.navTitle, context, sliceTitle: title,
+          type: card.dataset.navType, id: card.dataset.elId || "" });
+      }
+    }
+    const matches = entries.filter(entry => {
+      const text = `${entry.title} ${entry.sliceTitle || ""} ${entry.type} ${entry.id}`.toLocaleLowerCase();
+      return terms.every(term => text.includes(term));
+    });
+    modelSearchResults.replaceChildren();
+    modelSearchCount.textContent = entries.length === 0 ? "No model content to search." :
+      matches.length === 0 ? "No matches. Try another title, type, or ID." :
+      `${matches.length} of ${entries.length} results`;
+    for (const entry of matches) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "navigator-result";
+      const title = document.createElement("span");
+      title.textContent = entry.title;
+      const detail = document.createElement("small");
+      detail.textContent = `${entry.type} · ${entry.context}${entry.id ? ` · ${entry.id}` : ""}`;
+      button.append(title, detail);
+      button.addEventListener("click", () => {
+        modelNavigator.close();
+        if (!entry.target.isConnected) return;
+        if (entry.target.classList.contains("card")) {
+          selectCard(entry.target);
+          entry.target.focus({ preventScroll: true });
+          scrollCardFullyIntoView(entry.target);
+        } else {
+          const header = entry.target.querySelector(".slice-header");
+          header.tabIndex = -1;
+          header.focus({ preventScroll: true });
+          preview.scrollTop = 0;
+          header.scrollIntoView({ block: "nearest", inline: "center" });
+        }
+      });
+      modelSearchResults.appendChild(button);
+    }
+  }
+
+  document.getElementById("findModelBtn").addEventListener("click", () => {
+    modelSearch.value = "";
+    renderModelSearch();
+    modelNavigator.showModal();
+    modelSearch.focus();
+  });
+  document.getElementById("closeNavigatorBtn").addEventListener("click", () => modelNavigator.close());
+  modelSearch.addEventListener("input", renderModelSearch);
+  modelSearch.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      modelNavigator.close();
+      return;
+    }
+    const first = modelSearchResults.querySelector("button");
+    if (first && (event.key === "ArrowDown" || event.key === "Enter")) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === "Enter") first.click();
+      else first.focus();
+    }
   });
 
   // ---------- Adding components ----------
@@ -1545,6 +1625,7 @@
       empty.className = "preview-empty";
       empty.textContent = slices ? "No slices yet — add one to begin." : "Nothing to preview.";
       preview.appendChild(empty);
+      if (modelNavigator.open) renderModelSearch();
       return;
     }
 
@@ -1558,6 +1639,7 @@
       const slice = s || {};
       const col = document.createElement("div");
       col.className = "slice-column";
+      col.dataset.sliceId = slice.id == null ? "" : String(slice.id);
       const sideBySideEvents = slice.sliceType === "STATE_CHANGE" ? asArray(slice.events).length : 0;
       if (sideBySideEvents > 1) {
         col.classList.add("has-side-by-side-events");
@@ -1633,6 +1715,7 @@
 
     lastOrdered = ordered;
     preview.appendChild(row);
+    if (modelNavigator.open) renderModelSearch();
     fitCardAndSliceWidths(row);
     restoreSelection(prevSel);
     if (flowObserver) {
