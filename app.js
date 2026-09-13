@@ -39,6 +39,16 @@
   const modalDeleteBtn = document.getElementById("modalDelete");
   const toastRegion = document.getElementById("toastRegion");
 
+  const infoBtn = document.getElementById("infoBtn");
+  const infoDialog = document.getElementById("infoDialog");
+  infoBtn.addEventListener("click", () => infoDialog.showModal());
+  infoDialog.addEventListener("click", (e) => {
+    if (e.target !== infoDialog) return;
+    const rect = infoDialog.getBoundingClientRect();
+    if (e.clientX < rect.left || e.clientX > rect.right ||
+        e.clientY < rect.top || e.clientY > rect.bottom) infoDialog.close();
+  });
+
   // ---------- Helpers ----------
 
   function escapeHtml(s) {
@@ -900,6 +910,7 @@
   }
 
   document.addEventListener("keydown", (e) => {
+    if (infoDialog.open) return;
     // Don't hijack typing or browser/editor shortcuts.
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const t = e.target;
