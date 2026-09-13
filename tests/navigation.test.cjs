@@ -7,7 +7,7 @@ const vm = require("node:vm");
 // the unrelated editor, storage, and schema validation services.
 const source = readFileSync(require.resolve("../app.js"), "utf8");
 const navigation = source.slice(source.indexOf("  let selectedEl = null;"),
-  source.indexOf('  document.addEventListener("keydown", (e) => {', source.indexOf("  function navKey(e)")));
+  source.indexOf("  // Search the rendered model"));
 
 function fixture(layout) {
   const cards = {};
@@ -18,7 +18,8 @@ function fixture(layout) {
       lane.cards = names.map((name, index) => {
         const top = laneIndex * 200 + (horizontal ? 0 : index * 80);
         const left = colIndex * 600 + (horizontal ? index * 150 : 0);
-        const card = { name, classList: { add() {}, remove() {} }, scrollIntoView() {},
+        const classes = new Set();
+        const card = { name, classList: { add: value => classes.add(value), remove: value => classes.delete(value), contains: value => classes.has(value) }, scrollIntoView() {},
           closest: () => column, getBoundingClientRect: () => ({ top, bottom: top + 60, left, right: left + 120 }) };
         cards[name] = card;
         return card;
@@ -27,10 +28,19 @@ function fixture(layout) {
     });
     return column;
   });
-  const context = vm.createContext({ preview: { querySelectorAll: () => columns } });
+  let keydown;
+  const context = vm.createContext({
+    preview: { querySelectorAll: () => columns },
+    infoDialog: { open: false }, modelNavigator: { open: false },
+    modalBackdrop: { hidden: true },
+    document: { addEventListener: (_, handler) => { keydown = handler; }, getElementById: () => null },
+  });
   vm.runInContext(navigation + "\n globalThis.nav = { selectCard, navKey, selected: () => selectedEl };", context);
   return {
     select: (name) => context.nav.selectCard(cards[name]),
+    cards,
+    selected: () => context.nav.selected(),
+    keydown: (key, target) => keydown({ key, target, preventDefault() {} }),
     press(key, expected) {
       let prevented = false;
       assert.equal(context.nav.navKey({ key, preventDefault() { prevented = true; } }), true);
@@ -85,4 +95,24 @@ test("stacked events retain vertical navigation and selection initializes", () =
   nav.press("ArrowUp", "first");
   nav.press("ArrowRight", "other");
   nav.press("ArrowRight", "other");
+});
+
+
+test("Escape removes the highlight and resets keyboard navigation", () => {
+  const nav = fixture(multiEventLayout);
+  nav.select("event2");
+  assert.equal(nav.cards.event2.classList.contains("selected"), true);
+  nav.keydown("Escape");
+  assert.equal(nav.cards.event2.classList.contains("selected"), false);
+  assert.equal(nav.selected(), null);
+  nav.keydown("Escape");
+  nav.press("ArrowRight", "command");
+});
+
+test("Escape in an input leaves diagram selection alone", () => {
+  const nav = fixture(multiEventLayout);
+  nav.select("event2");
+  nav.keydown("Escape", { tagName: "INPUT" });
+  assert.equal(nav.selected(), nav.cards.event2);
+  assert.equal(nav.cards.event2.classList.contains("selected"), true);
 });

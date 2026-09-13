@@ -927,6 +927,12 @@
     const formBackdrop = document.getElementById("formBackdrop");
     if (formBackdrop && !formBackdrop.hidden) return;
 
+    if (e.key === "Escape" && selectedEl) {
+      selectedEl.classList.remove("selected");
+      selectedEl = null;
+      e.preventDefault();
+      return;
+    }
     if (navKey(e)) return;
     // Reuse the card's own click wiring, which opens its detail modal.
     if ((e.key === " " || e.key === "Enter") && selectedEl) { e.preventDefault(); selectedEl.click(); }
