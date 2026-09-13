@@ -1524,7 +1524,7 @@
     selectedEl = null;
     ++flowGeneration;
     routingClient.cancel();
-    routingStats.textContent = "No connectors";
+    routingStats.textContent = "";
     if (flowObserver) flowObserver.disconnect();
     preview.innerHTML = "";
 
@@ -1903,7 +1903,7 @@
 
   async function drawFlowLines() {
     const generation = ++flowGeneration;
-    routingStats.textContent = "No connectors";
+    routingStats.textContent = "";
     const row = preview.querySelector(".preview-row");
     if (!row || !lastOrdered) return;
     const prior = row.querySelector("svg.flow-lines");

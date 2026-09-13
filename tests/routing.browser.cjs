@@ -47,7 +47,7 @@ const omitted=await page.locator('#routingStats').innerText();
 assert.match(omitted,/could not be routed: .+ → .+/);
 await check('infeasible layout', Number(omitted.split('/')[0]));
 await page.locator('#input').fill(JSON.stringify({slices:[]}));await page.waitForTimeout(300);
-assert.equal(await page.locator('.flow-line').count(),0);assert.equal(await page.locator('#routingStats').innerText(),'No connectors');
+assert.equal(await page.locator('.flow-line').count(),0);assert.equal(await page.locator('#routingStats').textContent(),'');
 assert.deepEqual(errors,[]);console.log('empty model clears routes; no browser errors');
 }finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});
