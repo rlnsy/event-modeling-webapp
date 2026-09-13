@@ -564,10 +564,29 @@ svg.flow-lines {
   border: 0;
   border-radius: 0;
   padding: 0;
+  box-shadow: none;
 }
 .card.type-screen.no-title:hover { background: none; }
 .card.type-screen.no-title .card-title { display: none; }
 .card.type-screen.no-title .screen-img { margin-top: 0; }
+/* Image-only screens show validation and navigation on the visible images,
+   rather than drawing a second box around the wider, invisible flow anchor. */
+.card.type-screen.no-title.has-gap .screen-img,
+.card.type-screen.no-title.has-gap .img-missing {
+  border-color: var(--warn);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 45%, transparent);
+}
+.card.type-screen.no-title.selected .screen-img,
+.card.type-screen.no-title.selected .img-missing {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.card.type-screen.no-title:focus-visible { outline: none; }
+.card.type-screen.no-title:focus-visible .screen-img,
+.card.type-screen.no-title:focus-visible .img-missing {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
 .card .spec-group {
   margin-top: 4px;
   font-size: 11px;

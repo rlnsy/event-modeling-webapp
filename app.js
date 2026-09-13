@@ -605,7 +605,7 @@
   // `ctx` locates the screen; clicking the card (or its image) opens it.
   function screenCard(screen, images, ctx) {
     const imgs = asArray(images);
-    const collapse = imgs.length && !(screen && screen.description);
+    const collapse = imgs.length && !descriptionText(screen);
     const body = document.createDocumentFragment();
     imgs.forEach((im) => {
       body.appendChild(embeddedImage(im));
