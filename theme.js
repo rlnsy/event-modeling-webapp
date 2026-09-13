@@ -51,6 +51,12 @@
 
   function apply() {
     document.documentElement.setAttribute("data-theme", resolved());
+    // Keep browser chrome in sync with the actual app theme, including a saved
+    // override of the OS preference. Read the CSS token to avoid duplicate colours.
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    const accent = window.getComputedStyle(document.documentElement)
+      .getPropertyValue("--accent").trim();
+    if (themeColor && accent) themeColor.setAttribute("content", accent);
   }
 
   function notify() {

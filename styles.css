@@ -62,6 +62,9 @@ html, body {
   margin: 0;
 }
 
+/* Safari can extend the page background into its browser chrome. */
+html { background: var(--accent); }
+
 body {
   display: flex;
   flex-direction: column;
@@ -73,12 +76,17 @@ body {
 
 /* ---------- Top bar ---------- */
 .topbar {
+  /* Newer Safari samples viewport-attached headers for its toolbar tint. */
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 10px 16px;
-  background: var(--bg-elev);
+  background: var(--accent);
+  color: var(--accent-on);
   border-bottom: 1px solid var(--line);
   flex: 0 0 auto;
 }
