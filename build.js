@@ -9,6 +9,7 @@ const OUT_DIR = "public";
 // The files the app actually serves/loads (see index.html).
 const STATIC_FILES = [
   "index.html",
+  "favicon.svg",
   "styles.css",
   "theme.js",
   "schema.js",
