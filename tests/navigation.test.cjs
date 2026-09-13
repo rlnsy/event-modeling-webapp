@@ -31,7 +31,7 @@ function fixture(layout) {
   let keydown;
   const context = vm.createContext({
     preview: { querySelectorAll: () => columns },
-    infoDialog: { open: false }, modelNavigator: { open: false },
+    modelNavigator: { open: false },
     modalBackdrop: { hidden: true },
     document: { addEventListener: (_, handler) => { keydown = handler; }, getElementById: () => null },
   });

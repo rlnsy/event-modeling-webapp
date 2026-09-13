@@ -757,7 +757,10 @@ svg.flow-lines {
   border-top: 1px solid var(--line);
   font-size: 12px;
   color: var(--fg-dim);
+  text-align: center;
+  line-height: 1.5;
 }
+.page-footer a { color: var(--accent); }
 
 /* ---------- Problems panel ---------- */
 .problems {
@@ -851,9 +854,6 @@ dialog.modal form {
   display: flex;
   flex-direction: column;
 }
-.info-dialog .modal-body { font-family: inherit; font-size: 14px; line-height: 1.5; }
-.info-dialog p { margin: 0; }
-.info-dialog a { color: var(--accent); }
 
 .session-dialog-message {
   margin: 0;

@@ -20,7 +20,6 @@
         <button id="deleteSessionBtn" type="button" title="Delete session">Delete</button>
       </div>
       <button id="downloadBtn" type="button" title="Export session as JSON">Export</button>
-      <button id="infoBtn" type="button" aria-haspopup="dialog" aria-controls="infoDialog">Info</button>
       <button id="themeToggle" type="button" title="Theme" aria-label="Theme"></button>
     </div>
   </header>
@@ -75,7 +74,10 @@
   </section>
 
   <footer class="page-footer">
-    <span>Built in <span role="img" aria-label="Canada">🇨🇦</span></span>
+    <span>Built in <span role="img" aria-label="Canada">🇨🇦</span>
+      <span aria-hidden="true"> &middot; </span>
+      View the event model <a href="https://github.com/dilgerma/event-modeling-spec"
+        target="_blank" rel="noopener">schema</a> on GitHub</span>
   </footer>
 
   <dialog class="modal model-navigator" id="modelNavigator" aria-labelledby="modelNavigatorTitle">
@@ -89,20 +91,6 @@
       <p id="modelSearchCount" role="status" aria-live="polite"></p>
     </div>
     <div id="modelSearchResults" class="navigator-results" aria-label="Search results"></div>
-  </dialog>
-
-  <dialog class="modal info-dialog" id="infoDialog" aria-labelledby="infoDialogTitle">
-    <form method="dialog">
-      <header class="modal-head">
-        <span class="modal-title" id="infoDialogTitle">About Blueprint</span>
-        <button class="modal-close" type="submit" aria-label="Close" autofocus>&times;</button>
-      </header>
-      <div class="modal-body">
-        <p>Blueprint &middot; tracks the
-          <a href="https://github.com/dilgerma/event-modeling-spec" target="_blank"
-            rel="noopener">Event Modeling spec</a></p>
-      </div>
-    </form>
   </dialog>
 
   <div class="modal-backdrop" id="modalBackdrop" hidden>
