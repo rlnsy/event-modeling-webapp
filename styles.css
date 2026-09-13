@@ -12,8 +12,9 @@
   --fg-dim: #9b9b9f;
   --fg-faint: #656569;
   --line: #2f2f32;
-  --accent: #75baff;
-  --accent-hover: #96cbff;
+  --accent: #96cbff;
+  --accent-hover: #b5daff;
+  --accent-text: var(--accent);
   --accent-on: #101820;
   --ok: #43b97a;
   --warn: #cfa14a;
@@ -38,9 +39,11 @@
   --fg-dim: #6b6b70;
   --fg-faint: #a0a0a5;
   --line: #e3e3e6;
-  --accent: #0075df;
-  --accent-hover: #0068cc;
-  --accent-on: #ffffff;
+  --accent: #75baff;
+  --accent-hover: #96cbff;
+  /* Keep small accent text readable on light surfaces. */
+  --accent-text: #0068cc;
+  --accent-on: #101820;
   --ok: #2f9e4f;
   --warn: #b8852b;
   --err: #df453a;
@@ -91,7 +94,7 @@ body {
 }
 
 .topbar h1 {
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 15px;
   font-weight: 600;
   margin: 0;
@@ -525,7 +528,7 @@ svg.flow-lines {
 }
 .card .card-fields .f-name { color: var(--fg); }
 .card .card-fields .f-map { color: var(--fg-faint); }
-.card .card-fields .f-type { color: var(--accent); }
+.card .card-fields .f-type { color: var(--accent-text); }
 .card .card-fields .f-ex { color: var(--ok); }
 .card .card-fields .f-flag {
   color: var(--warn);
@@ -776,7 +779,7 @@ svg.flow-lines {
   text-align: center;
   line-height: 1.5;
 }
-.page-footer a { color: var(--accent); }
+.page-footer a { color: var(--accent-text); }
 
 /* ---------- Problems panel ---------- */
 .problems {
@@ -798,7 +801,7 @@ svg.flow-lines {
 }
 .problems li:hover { background: var(--bg-elev); border-left-color: var(--err); }
 .problems .loc {
-  color: var(--accent);
+  color: var(--accent-text);
   flex: 0 0 auto;
   min-width: 84px;
 }
@@ -975,7 +978,7 @@ dialog.modal form {
 .edit-toggle-btn:hover { background: var(--btn-hover); }
 .edit-toggle-btn.active {
   background: color-mix(in srgb, var(--accent) 16%, var(--bg-elev));
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: var(--accent);
 }
 .edit-toggle-btn.active:hover {
@@ -1005,7 +1008,7 @@ body.editor-hidden .preview-empty {
 /* Shared look for the "+ Add Slice" button and the per-slice "+ Add" summary. */
 .add-btn {
   background: color-mix(in srgb, var(--accent) 12%, var(--bg-elev));
-  color: var(--accent);
+  color: var(--accent-text);
   border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
   border-radius: 6px;
   padding: 4px 9px;
@@ -1257,7 +1260,7 @@ input[type="checkbox"].form-input {
 .add-field-btn {
   align-self: flex-start;
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-text);
   border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line));
   border-radius: 6px;
   padding: 5px 10px;
@@ -1266,7 +1269,7 @@ input[type="checkbox"].form-input {
 }
 .add-field-btn:hover {
   background: color-mix(in srgb, var(--accent) 12%, var(--bg-elev));
-  color: var(--accent-hover);
+  color: var(--accent-text);
 }
 
 /* Nested object editing: a field item stacks its input row over an indented,
