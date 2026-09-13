@@ -1422,3 +1422,9 @@ input[type="checkbox"].form-input {
 }
 .spec-example-btn:hover { background: var(--btn-hover); }
 .spec-example-btn[hidden] { display: none; }
+
+/* Reserve space for separate connector paths; difficult layouts can expand. */
+.preview-wrap { flex-direction: column; }
+.routing-stats { padding: 8px 16px; font-size: 12px; flex-shrink: 0; }
+.preview-row { gap: 48px; }
+.slice-column { gap: var(--routing-lane-gap, 96px); }

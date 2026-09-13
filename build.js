@@ -15,6 +15,9 @@ const STATIC_FILES = [
   "sessions.js",
   "forms.js",
   "app.js",
+  "routing.js",
+  "routing-client.js",
+  "routing-worker.js",
 ];
 
 await rm(OUT_DIR, { recursive: true, force: true });

@@ -1522,6 +1522,10 @@
     // Capture the keyboard selection so it survives the DOM rebuild below.
     const prevSel = selectedEl ? { id: selectedEl.dataset.elId, pos: navState(navColumns()) } : null;
     selectedEl = null;
+    ++flowGeneration;
+    routingClient.cancel();
+    routingStats.textContent = "No connectors";
+    if (flowObserver) flowObserver.disconnect();
     preview.innerHTML = "";
 
     const slices = parsed && Array.isArray(parsed.slices) ? parsed.slices : null;
@@ -1621,7 +1625,10 @@
     preview.appendChild(row);
     fitCardAndSliceWidths(row);
     restoreSelection(prevSel);
-    if (flowObserver) { flowObserver.disconnect(); flowObserver.observe(row); }
+    if (flowObserver) {
+      flowObserver.observe(row);
+      row.querySelectorAll(".card").forEach(card => flowObserver.observe(card));
+    }
     drawFlowLines();
   }
 
@@ -1888,72 +1895,15 @@
     return String(s).replace(/["\\\]]/g, "\\$&");
   }
 
-  // Each *Path returns { d, tip, dir }: the SVG path data, the consumer-end point
-  // the arrowhead sits at, and the unit vector of the line's tangent there. The
-  // arrowhead is drawn explicitly from `dir` (not an SVG marker), so it always
-  // lines up with the curve regardless of browser marker-orient behavior. Boxes
-  // are { x, y, w, h, cx, cy } in the row's content coordinate space.
+  // Arrowheads are SVG end markers on the same continuous path. The final
+  // straight approach is at least 16px, longer than the 10px arrowhead.
+  const routingStats = document.getElementById("routingStats");
+  const routingClient = new ConnectorRoutingClient();
+  let flowGeneration = 0;
 
-  // A clean straight vertical connector between two cards stacked in the same
-  // column: source edge center to target edge center. Spans exactly the gap
-  // between them, so it never overshoots into either card.
-  function intraPath(a, b) {
-    const down = b.cy >= a.cy; // target below source
-    const p = { x: a.cx, y: down ? a.y + a.h : a.y };
-    const q = { x: b.cx, y: down ? b.y : b.y + b.h };
-    const d = "M" + p.x + "," + p.y + " L" + q.x + "," + q.y;
-    return { d, tip: q, dir: { x: 0, y: down ? 1 : -1 } };
-  }
-
-  // Command -> event edges may fan out when a state-change slice has multiple
-  // events, so keep them orthogonal instead of drawing diagonals.
-  function commandEventPath(a, b) {
-    const down = b.cy >= a.cy;
-    const p = { x: a.cx, y: down ? a.y + a.h : a.y };
-    const q = { x: b.cx, y: down ? b.y : b.y + b.h };
-    if (Math.abs(p.x - q.x) < 0.5) {
-      return { d: "M" + p.x + "," + p.y + " L" + q.x + "," + q.y, tip: q, dir: { x: 0, y: down ? 1 : -1 } };
-    }
-    const turnY = (p.y + q.y) / 2;
-    const d = "M" + p.x + "," + p.y +
-      " L" + p.x + "," + turnY +
-      " L" + q.x + "," + turnY +
-      " L" + q.x + "," + q.y;
-    return { d, tip: q, dir: { x: 0, y: down ? 1 : -1 } };
-  }
-
-  // Cross-slice event -> read-model edge. Route down from the event, horizontally
-  // below the lane, then up into the read model so left-side events don't cut
-  // across neighbouring events on their way to the read model.
-  const CROSS_DIP = 40;      // px the U's baseline sits below the lower card
-  function crossPath(a, b) {
-    const q = { x: b.cx, y: b.y + b.h }; // enter read model from below, head up
-    const p = { x: a.cx, y: a.y + a.h }; // exit the event's bottom
-    const baseY = Math.max(a.y + a.h, b.y + b.h) + CROSS_DIP;
-    const d = "M" + p.x + "," + p.y +
-      " L" + p.x + "," + baseY +
-      " L" + q.x + "," + baseY +
-      " L" + q.x + "," + q.y;
-    return { d, tip: q, dir: { x: 0, y: -1 } };
-  }
-
-  // Draw a small filled triangle arrowhead at `tip`, pointing along unit `dir`.
-  const HEAD_LEN = 10, HEAD_HALF = 3.5;
-  function drawArrowHead(svg, tip, dir) {
-    const bx = tip.x - dir.x * HEAD_LEN, by = tip.y - dir.y * HEAD_LEN;
-    const px = -dir.y, py = dir.x; // unit perpendicular
-    const poly = document.createElementNS(SVG_NS, "polygon");
-    poly.setAttribute("points",
-      tip.x + "," + tip.y + " " +
-      (bx + px * HEAD_HALF) + "," + (by + py * HEAD_HALF) + " " +
-      (bx - px * HEAD_HALF) + "," + (by - py * HEAD_HALF));
-    poly.setAttribute("class", "flow-arrowhead");
-    svg.appendChild(poly);
-  }
-
-  // (Re)build the flow-line overlay over the current preview row. Safe to call
-  // repeatedly; removes any prior overlay first. No-op when nothing is rendered.
-  function drawFlowLines() {
+  async function drawFlowLines() {
+    const generation = ++flowGeneration;
+    routingStats.textContent = "No connectors";
     const row = preview.querySelector(".preview-row");
     if (!row || !lastOrdered) return;
     const prior = row.querySelector("svg.flow-lines");
@@ -1981,19 +1931,67 @@
       return { x, y, w: r.width, h: r.height, cx: x + r.width / 2, cy: y + r.height / 2 };
     };
 
-    for (const { fromId, toId, kind } of edges) {
-      const a = boxOf(fromId), b = boxOf(toId);
-      if (!a || !b) continue;
-      const shape = kind === "cross" ? crossPath(a, b) :
-        kind === "command-event" ? commandEventPath(a, b) : intraPath(a, b);
+    const boxes = Object.create(null);
+    row.querySelectorAll("[data-el-id]").forEach(card => {
+      const id = card.getAttribute("data-el-id");
+      boxes[id] = boxOf(id);
+    });
+    routingStats.textContent = `Routing ${edges.length} connections…`;
+    let routes, routingError = "";
+    try {
+      routes = await routingClient.request(edges, boxes);
+    } catch (error) {
+      if (generation !== flowGeneration) return;
+      routingError = error.message;
+      routes = edges.map(() => null);
+    }
+    if (generation !== flowGeneration || !row.isConnected) return;
+    // Expand the whole slice layout, preserving its order and dependency semantics.
+    // Each retry measures real DOM boxes, including card growth, before routing.
+    const level = Number(row.dataset.routingLevel || 0);
+    if (!routingError && routes.some(route => !route) && level < 2) {
+      row.dataset.routingLevel = level + 1;
+      row.style.columnGap = (48 + (level + 1) * 64) + "px";
+      row.style.setProperty("--routing-lane-gap", (96 + (level + 1) * 64) + "px");
+      drawFlowLines();
+      return;
+    }
+    const defs = document.createElementNS(SVG_NS, "defs");
+    const marker = document.createElementNS(SVG_NS, "marker");
+    for (const [name, value] of Object.entries({ id: "flow-tip", viewBox: "0 0 10 7", refX: "10", refY: "3.5",
+      markerWidth: "10", markerHeight: "7", markerUnits: "userSpaceOnUse", orient: "auto" })) marker.setAttribute(name, value);
+    const triangle = document.createElementNS(SVG_NS, "path");
+    triangle.setAttribute("d", "M0,0 L10,3.5 L0,7 Z");
+    triangle.setAttribute("fill", "context-stroke");
+    marker.appendChild(triangle); defs.appendChild(marker); svg.appendChild(defs);
+    let failures = 0, intrusions = 0, extentW = W, extentH = H;
+    for (const [edgeIndex, { fromId, toId }] of edges.entries()) {
+      const a = boxes[fromId], b = boxes[toId];
+      if (!a || !b) { failures++; continue; }
+      const points = routes[edgeIndex];
+      if (!points || points.length < 2) { failures++; continue; }
+      const shape = { d: points.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" ") };
+      const drawn = points;
+      for (const p of drawn) { extentW = Math.max(extentW, p.x + 14); extentH = Math.max(extentH, p.y + 14); }
+      for (const [id, box] of Object.entries(boxes)) {
+        if (id === String(fromId) || id === String(toId)) continue;
+        if (drawn.some((p, i) => i && ConnectorRouting.intersects(drawn[i-1], p, box))) intrusions++;
+      }
       const path = document.createElementNS(SVG_NS, "path");
       path.setAttribute("class", "flow-line");
+      path.setAttribute("marker-end", "url(#flow-tip)");
       path.setAttribute("d", shape.d);
       svg.appendChild(path);
-      drawArrowHead(svg, shape.tip, shape.dir);
     }
 
+    svg.setAttribute("width", extentW);
+    svg.setAttribute("height", extentH);
+    svg.setAttribute("viewBox", "0 0 " + extentW + " " + extentH);
     row.appendChild(svg);
+    routingStats.textContent = `${edges.length-failures}/${edges.length} connections · ${intrusions} card intersections · no shared or crossing lines` +
+      (failures ? ` · ${failures} connections could not be routed: ` +
+        edges.filter((_,i)=>!routes[i]).map(e=>`${e.fromId} → ${e.toId}`).join(", ") : "") +
+      (routingError ? ` · ${routingError}` : "");
   }
 
   // True when `el` feeds at least one element of the given element `type`.
