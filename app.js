@@ -1535,7 +1535,6 @@
     selectedEl = null;
     ++flowGeneration;
     routingClient.cancel();
-    routingStats.textContent = "";
     if (flowObserver) flowObserver.disconnect();
     preview.innerHTML = "";
 
@@ -1908,13 +1907,11 @@
 
   // Arrowheads are SVG end markers on the same continuous path. The final
   // straight approach is at least 16px, longer than the 10px arrowhead.
-  const routingStats = document.getElementById("routingStats");
   const routingClient = new ConnectorRoutingClient();
   let flowGeneration = 0;
 
   async function drawFlowLines() {
     const generation = ++flowGeneration;
-    routingStats.textContent = "";
     const row = preview.querySelector(".preview-row");
     if (!row || !lastOrdered) return;
     const prior = row.querySelector("svg.flow-lines");
@@ -1947,7 +1944,6 @@
       const id = card.getAttribute("data-el-id");
       boxes[id] = boxOf(id);
     });
-    routingStats.textContent = `Routing ${edges.length} connections…`;
     let routes, routingError = "";
     try {
       routes = await routingClient.request(edges, boxes);
@@ -1975,19 +1971,15 @@
     triangle.setAttribute("d", "M0,0 L10,3.5 L0,7 Z");
     triangle.setAttribute("fill", "context-stroke");
     marker.appendChild(triangle); defs.appendChild(marker); svg.appendChild(defs);
-    let failures = 0, intrusions = 0, extentW = W, extentH = H;
+    let extentW = W, extentH = H;
     for (const [edgeIndex, { fromId, toId }] of edges.entries()) {
       const a = boxes[fromId], b = boxes[toId];
-      if (!a || !b) { failures++; continue; }
+      if (!a || !b) continue;
       const points = routes[edgeIndex];
-      if (!points || points.length < 2) { failures++; continue; }
+      if (!points || points.length < 2) continue;
       const shape = { d: points.map((p, i) => (i ? "L" : "M") + p.x + "," + p.y).join(" ") };
       const drawn = points;
       for (const p of drawn) { extentW = Math.max(extentW, p.x + 14); extentH = Math.max(extentH, p.y + 14); }
-      for (const [id, box] of Object.entries(boxes)) {
-        if (id === String(fromId) || id === String(toId)) continue;
-        if (drawn.some((p, i) => i && ConnectorRouting.intersects(drawn[i-1], p, box))) intrusions++;
-      }
       const path = document.createElementNS(SVG_NS, "path");
       path.setAttribute("class", "flow-line");
       path.setAttribute("marker-end", "url(#flow-tip)");
@@ -1999,10 +1991,6 @@
     svg.setAttribute("height", extentH);
     svg.setAttribute("viewBox", "0 0 " + extentW + " " + extentH);
     row.appendChild(svg);
-    routingStats.textContent = `${edges.length-failures}/${edges.length} connections · ${intrusions} card intersections · no shared or crossing lines` +
-      (failures ? ` · ${failures} connections could not be routed: ` +
-        edges.filter((_,i)=>!routes[i]).map(e=>`${e.fromId} → ${e.toId}`).join(", ") : "") +
-      (routingError ? ` · ${routingError}` : "");
   }
 
   // True when `el` feeds at least one element of the given element `type`.

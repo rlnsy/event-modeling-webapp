@@ -12,18 +12,19 @@ await page.locator('#paneToggle').click();
 const model=JSON.parse(fs.readFileSync(path.join(__dirname, '../prototype/crowded.json'),'utf8'));
 await page.locator('#input').fill(JSON.stringify(model));
 async function check(label, count = 11) {
- await page.waitForFunction(count=>document.querySelector('#routingStats').textContent.startsWith(count+'/11'),count,{timeout:20000});
+ await page.waitForFunction(count=>document.querySelectorAll('.flow-line').length===count,count,{timeout:20000});
+ assert.equal(await page.locator('#routingStats, .routing-stats').count(),0);
  const result=await page.evaluate(()=>{
  const row=document.querySelector('.preview-row'), origin=row.getBoundingClientRect();
  const boxes=[...row.querySelectorAll('[data-el-id]')].map(c=>{const r=c.getBoundingClientRect();return {x:r.x-origin.x,y:r.y-origin.y,w:r.width,h:r.height};});
  const paths=[...row.querySelectorAll('.flow-line')].map(p=>[...p.getAttribute('d').matchAll(/[ML]([\d.-]+),([\d.-]+)/g)].map(m=>({x:+m[1],y:+m[2]})));
  return {paths,boxes,conflicts:paths.flatMap((p,i)=>paths.slice(i+1).filter(q=>ConnectorRouting.conflicts(p,q))).length,
  intersections:paths.flatMap(p=>p.slice(1).flatMap((b,i)=>boxes.filter(box=>ConnectorRouting.intersects(p[i],b,box)))).length,
- markers:[...row.querySelectorAll('.flow-line')].every(p=>p.getAttribute('marker-end')==='url(#flow-tip)'),stats:document.querySelector('#routingStats').textContent};
+ markers:[...row.querySelectorAll('.flow-line')].every(p=>p.getAttribute('marker-end')==='url(#flow-tip)')};
  });
  assert.equal(result.paths.length,count);assert.equal(result.conflicts,0);assert.equal(result.intersections,0);assert.ok(result.markers);
  for(const p of result.paths) assert.ok(Math.hypot(p.at(-1).x-p.at(-2).x,p.at(-1).y-p.at(-2).y)>=16);
- console.log(label,result.stats);
+ console.log(label,result.paths.length+' routed connections');
  return result;
 }
 await check('crowded');
@@ -42,12 +43,10 @@ await page.waitForFunction(()=>Number(document.querySelector('.preview-row').dat
 await check('global spacing recovery');
 // Prevent expansion to exercise explicit omissions while preserving valid lines.
 await page.addStyleTag({content: '.slice-column { gap: 0px !important; }'});
-await page.waitForFunction(()=>document.querySelector('#routingStats').textContent.includes('could not be routed'));
-const omitted=await page.locator('#routingStats').innerText();
-assert.match(omitted,/could not be routed: .+ → .+/);
-await check('infeasible layout', Number(omitted.split('/')[0]));
+await page.waitForFunction(()=>Number(document.querySelector('.preview-row').dataset.routingLevel)===2 && document.querySelector('svg.flow-lines') && document.querySelectorAll('.flow-line').length<11);
+await check('infeasible layout', await page.locator('.flow-line').count());
 await page.locator('#input').fill(JSON.stringify({slices:[]}));await page.waitForTimeout(300);
-assert.equal(await page.locator('.flow-line').count(),0);assert.equal(await page.locator('#routingStats').textContent(),'');
+assert.equal(await page.locator('.flow-line').count(),0);assert.equal(await page.locator('#routingStats, .routing-stats').count(),0);
 assert.deepEqual(errors,[]);console.log('empty model clears routes; no browser errors');
 }finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});
