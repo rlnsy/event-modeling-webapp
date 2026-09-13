@@ -343,11 +343,12 @@
     const compactExample = opts && opts.compactWhenExample && ex != null;
 
     const mapping = fieldMapping(f);
-    if (mapping) {
-      const computed = fieldSources(f, f.name).length > 1;
+    if (mapping || f.computed === true) {
+      const computed = f.computed === true;
       const map = document.createElement("span");
       map.className = computed ? "f-flag" : "f-map";
       map.textContent = computed ? "computed" : "<- " + mapping;
+      if (mapping) map.title = "Source: " + mapping;
       head.appendChild(map);
     }
 
@@ -2178,8 +2179,7 @@
                 });
                 continue;
               }
-              if (sources.length === 1) {
-                const source = sources[0];
+              for (const source of field.computed === true ? [] : sources) {
                 const types = linkedFields.get(source);
                 if (field.type != null && types && types.size > 0 && !types.has(field.type)) {
                   findings.push({
@@ -2245,15 +2245,16 @@
           });
           continue;
         }
-        if (sources.length !== 1) continue;
-        // Sourced — but surface a type drift when no source offers a matching type.
-        const source = sources[0];
-        const types = available.get(source);
-        if (f.type != null && types.size > 0 && !types.has(f.type)) {
-          findings.push({
-            kind: "warning", locLabel: "type", elementId: el.id,
-            msg: `${label} '${title}': field '${path}'${source !== f.name ? ` mapped from '${source}'` : ""} type ${f.type} differs from upstream type ${Array.from(types).join(" / ")}.`,
-          });
+        // Only an explicit computed flag permits source type differences.
+        if (f.computed === true) continue;
+        for (const source of sources) {
+          const types = available.get(source);
+          if (f.type != null && types.size > 0 && !types.has(f.type)) {
+            findings.push({
+              kind: "warning", locLabel: "type", elementId: el.id,
+              msg: `${label} '${title}': field '${path}'${source !== f.name ? ` mapped from '${source}'` : ""} type ${f.type} differs from upstream type ${Array.from(types).join(" / ")}.`,
+            });
+          }
         }
       }
     }

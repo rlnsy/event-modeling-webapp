@@ -147,6 +147,7 @@ window.EVENT_MODELING_SCHEMA = {
         "example": { "oneOf": [{ "type": "string" }, { "type": "object" }] },
         "subfields": { "type": "array", "items": { "$ref": "#/$defs/Field" } },
         "mapping": { "type": "string" },
+        "computed": { "type": "boolean" },
         "optional": { "type": "boolean" },
         "technicalAttribute": { "type": "boolean" },
         "generated": { "type": "boolean" },
