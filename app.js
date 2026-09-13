@@ -427,6 +427,7 @@
     command: "📣",
     automation: "⚙️", // slice.processors render as the "automation" card type
     specification: "ℹ️",
+    error: "❌",
   };
 
   function descriptionText(item) {
@@ -489,7 +490,8 @@
     return card;
   }
 
-  // A specification card: each given/when/then step with its fields inline.
+  // Scenario steps share element card styling, but have no flow anchors or
+  // independent navigation: activating a step opens its owning specification.
   function specBody(spec) {
     const wrap = document.createDocumentFragment();
     const comments = specCommentText(spec);
@@ -518,7 +520,7 @@
       group.appendChild(lbl);
       if (steps.length === 0) {
         const st = document.createElement("div");
-        st.className = "spec-step spec-step-empty";
+        st.className = "spec-step-empty";
         st.textContent = "Nothing";
         group.appendChild(st);
         wrap.appendChild(group);
@@ -526,19 +528,19 @@
       }
       for (const step of steps) {
         const st = document.createElement("div");
-        st.className = "spec-step";
-        if (step && step.type === "SPEC_ERROR") {
-          const badge = document.createElement("span");
-          badge.className = "spec-error-badge";
-          badge.textContent = "Error";
-          st.appendChild(badge);
-          st.appendChild(document.createTextNode(" " + (step.title != null ? String(step.title) : "?")));
-        } else {
-          st.textContent = step && step.title != null ? String(step.title) : "?";
-        }
-        group.appendChild(st);
+        const type = {
+          SPEC_COMMAND: "command", SPEC_EVENT: "event",
+          SPEC_READMODEL: "readmodel", SPEC_ERROR: "error",
+        }[step && step.type];
+        st.className = "spec-step" + (type ? " type-" + type : "");
+        const title = document.createElement("div");
+        title.className = "card-title";
+        const titleText = step && step.title != null ? String(step.title) : "?";
+        title.textContent = (TYPE_ICONS[type] ? TYPE_ICONS[type] + " " : "") + titleText;
+        st.appendChild(title);
         const fields = asArray(step && step.fields);
-        if (fields.length) group.appendChild(fieldList(fields, null, { shortenUuid: true, compactWhenExample: true }));
+        if (fields.length) st.appendChild(fieldList(fields, null, { shortenUuid: true, compactWhenExample: true }));
+        group.appendChild(st);
       }
       wrap.appendChild(group);
     }
@@ -1569,7 +1571,8 @@
     let fieldWidth = 0;
     const lines = card.querySelectorAll(".card-fields li:not(.f-redundant):not(.has-sub), .card-fields .f-head");
     for (const line of lines) {
-      fieldWidth = Math.max(fieldWidth, fieldLineContentWidth(line));
+      const step = line.closest(".spec-step");
+      fieldWidth = Math.max(fieldWidth, fieldLineContentWidth(line) + (step ? cardChromeWidth(step) : 0));
     }
     return Math.max(200, Math.ceil(fieldWidth + cardChromeWidth(card)));
   }

@@ -444,7 +444,7 @@ svg.flow-lines {
   gap: 6px;
 }
 
-.card {
+.card, .spec-step {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 5px;
@@ -467,23 +467,28 @@ svg.flow-lines {
 /* Element-type color coding (event-modeling convention): commands blue,
    events orange, read models green. A tinted background + matching border keeps
    the card legible in both themes while signaling its type at a glance. */
-.card.type-command {
+:is(.card, .spec-step).type-command {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
   background: color-mix(in srgb, var(--accent) 8%, var(--panel));
 }
-.card.type-command:hover { background: color-mix(in srgb, var(--accent) 15%, var(--panel)); }
+:is(.card, .spec-step).type-command:hover { background: color-mix(in srgb, var(--accent) 15%, var(--panel)); }
 
-.card.type-event {
+:is(.card, .spec-step).type-event {
   border-color: color-mix(in srgb, var(--event) 55%, var(--line));
   background: color-mix(in srgb, var(--event) 9%, var(--panel));
 }
-.card.type-event:hover { background: color-mix(in srgb, var(--event) 16%, var(--panel)); }
+:is(.card, .spec-step).type-event:hover { background: color-mix(in srgb, var(--event) 16%, var(--panel)); }
 
-.card.type-readmodel {
+:is(.card, .spec-step).type-readmodel {
   border-color: color-mix(in srgb, var(--ok) 55%, var(--line));
   background: color-mix(in srgb, var(--ok) 8%, var(--panel));
 }
-.card.type-readmodel:hover { background: color-mix(in srgb, var(--ok) 15%, var(--panel)); }
+:is(.card, .spec-step).type-readmodel:hover { background: color-mix(in srgb, var(--ok) 15%, var(--panel)); }
+.spec-step.type-error {
+  border-color: color-mix(in srgb, var(--err) 55%, var(--line));
+  background: color-mix(in srgb, var(--err) 9%, var(--panel));
+}
+.spec-step.type-error:hover { background: color-mix(in srgb, var(--err) 16%, var(--panel)); }
 .card .card-title {
   font-size: 12.5px;
   font-weight: 600;
@@ -588,7 +593,7 @@ svg.flow-lines {
   outline-offset: 1px;
 }
 .card .spec-group {
-  margin-top: 4px;
+  margin-top: 10px;
   font-size: 11px;
   line-height: 16px;
 }
@@ -599,24 +604,16 @@ svg.flow-lines {
   font-size: 10px;
   letter-spacing: 0.3px;
 }
-.card .spec-group .spec-step {
-  color: var(--fg-dim);
-  font-weight: 600;
-  margin-top: 2px;
+.spec-step {
+  min-width: 0;
+  width: 100%;
+  margin-top: 5px;
 }
 .card .spec-group .spec-step-empty {
+  margin-top: 4px;
   color: var(--fg-faint);
   font-style: italic;
 }
-.card .spec-group .spec-error-badge {
-  color: var(--err);
-  background: color-mix(in srgb, var(--err) 12%, transparent);
-  border-radius: 3px;
-  padding: 0 4px;
-  font-size: 9.5px;
-  text-transform: uppercase;
-}
-.card .spec-group .card-fields { margin: 1px 0 2px 8px; }
 
 /* A list read model gets a small "list" badge pinned to the card's top-right
    corner to mark it as a collection of records rather than a single one. */

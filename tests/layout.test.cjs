@@ -13,10 +13,10 @@ function style() {
     removeProperty: (key) => values.delete(key), getPropertyValue: (key) => values.get(key) };
 }
 
-function fit(fieldWidths, gap = "10px", stackedWidth = 0) {
+function fit(fieldWidths, gap = "10px", stackedWidth = 0, scenario = false) {
   const cards = fieldWidths.map((width) => ({
     style: style(),
-    querySelectorAll: () => [{ scrollWidth: width, getBoundingClientRect: () => ({ width }) }],
+    querySelectorAll: () => [{ closest: () => scenario ? {} : null, scrollWidth: width, getBoundingClientRect: () => ({ width }) }],
     getBoundingClientRect() { return { width: parseFloat(this.style.getPropertyValue("--card-width")) || 200 }; },
   }));
   const lane = { querySelectorAll: () => cards, columnGap: gap,
@@ -47,4 +47,8 @@ test("slice includes unequal event widths and fractional gaps", () => {
 
 test("a wider stacked card still determines the slice width", () => {
   assert.equal(fit([0, 0], "10px", 800), "800px");
+});
+
+test("scenario sizing includes both the step and specification card padding", () => {
+  assert.equal(fit([300], "10px", 0, true), "336px");
 });
