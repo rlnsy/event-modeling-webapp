@@ -2053,7 +2053,7 @@
       markerWidth: "10", markerHeight: "7", markerUnits: "userSpaceOnUse", orient: "auto" })) marker.setAttribute(name, value);
     const triangle = document.createElementNS(SVG_NS, "path");
     triangle.setAttribute("d", "M0,0 L10,3.5 L0,7 Z");
-    triangle.setAttribute("fill", "context-stroke");
+    triangle.setAttribute("class", "flow-arrowhead");
     marker.appendChild(triangle); defs.appendChild(marker); svg.appendChild(defs);
     let extentW = W, extentH = H;
     for (const [edgeIndex, { fromId, toId }] of edges.entries()) {
