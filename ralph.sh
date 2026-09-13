@@ -14,9 +14,11 @@ Requirements:
 - Use the skill to discover task state.
 - Select the highest-priority actionable task.
 - Continue existing work when appropriate.
+- Work on a 'ralph' branch in your own worktree (also called 'ralph')
 - Make the required code changes.
 - Run relevant tests, checks, builds, or linters.
 - Update task state using the skill.
+- Do not merge your branch to main.
 - If the current task is blocked, record that through the skill and exit this iteration.
 - If there are no actionable tasks remaining, output exactly:
 
