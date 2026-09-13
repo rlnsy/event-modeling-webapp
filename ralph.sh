@@ -14,11 +14,36 @@ for setting in MAX_ITERATIONS SLEEP_SECONDS POLL_SECONDS; do
 done
 
 command -v codex >/dev/null || { echo "codex is required." >&2; exit 1; }
+command -v node >/dev/null || { echo "node is required." >&2; exit 1; }
 
-PROMPT="$(cat <<'EOF'
+APP_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SERVER_SCRIPT="$APP_DIR/node_modules/http-server/bin/http-server"
+if [[ ! -f "$SERVER_SCRIPT" ]]; then
+  echo "Install project dependencies before running Ralph (http-server is required)." >&2
+  exit 1
+fi
+
+SERVER_LOG="$(mktemp "${TMPDIR:-/tmp}/ralph-server.XXXXXX")"
+nohup node "$SERVER_SCRIPT" "$APP_DIR" -p 8777 -c-1 >"$SERVER_LOG" 2>&1 < /dev/null &
+SERVER_PID=$!
+sleep 1
+if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+  echo "App server failed to start. See $SERVER_LOG:" >&2
+  cat "$SERVER_LOG" >&2
+  exit 1
+fi
+echo "App server: http://localhost:8777 (PID: $SERVER_PID; log: $SERVER_LOG)"
+
+PROMPT="$(cat <<EOF
 Use the pad skill.
 
 Find the next available task and work on it.
+
+Server context:
+- The app is already running in the background at http://localhost:8777.
+- Initial server PID: $SERVER_PID. Serving directory: $APP_DIR. Log: $SERVER_LOG.
+- Restart it if needed, including to serve changes from your worktree. Verify the current server PID before stopping it; the initial PID may be stale after a restart.
+- Start replacements with nohup node "$SERVER_SCRIPT" "<serving directory>" -p 8777 -c-1 >"$SERVER_LOG" 2>&1 < /dev/null & and record the new PID from \$!. Keep the server running after your session ends.
 
 Requirements:
 - Inspect the current repository state first.
@@ -30,7 +55,6 @@ Requirements:
 - Run relevant tests, checks, builds, or linters.
 - Update task state using the skill.
 - Do not merge your branch to main.
-- Keep the app served at port 8777, in the background so it doesn't stop when this session stops. Restart it if needed.
 - If the current task is blocked, record that through the skill and exit this iteration.
 - If there are no actionable tasks remaining, output exactly:
 
