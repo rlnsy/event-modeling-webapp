@@ -13,7 +13,7 @@ function fixture(layout) {
   const cards = {};
   const document = { activeElement: null };
   const columns = layout.map((lanes, colIndex) => {
-    const column = { querySelectorAll: (selector) => selector === ".lane" ? rows : rows.flatMap((lane) => lane.cards) };
+    const column = { querySelector: () => null, querySelectorAll: (selector) => selector === ".lane" ? rows : rows.flatMap((lane) => lane.cards) };
     const rows = lanes.map(({ names, horizontal = false }, laneIndex) => {
       const lane = { classList: { contains: () => horizontal }, querySelectorAll: () => lane.cards };
       lane.cards = names.map((name, index) => {
@@ -32,7 +32,8 @@ function fixture(layout) {
   });
   let keydown;
   const context = vm.createContext({
-    preview: { querySelectorAll: () => columns },
+    preview: { querySelectorAll: () => columns, getBoundingClientRect: () => ({ top: 0, left: 0 }),
+      clientTop: 0, clientLeft: 0, clientWidth: 1280, clientHeight: 720, scrollTop: 0, scrollLeft: 0 },
     modelNavigator: { open: false },
     modalBackdrop: { hidden: true },
     document: Object.assign(document, { addEventListener: (_, handler) => { keydown = handler; }, getElementById: () => null }),

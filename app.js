@@ -793,22 +793,33 @@
     if (document.activeElement?.classList.contains("card") && document.activeElement !== card) {
       card.focus({ preventScroll: true });
     }
-    // `nearest` keeps the card on screen without fighting the sticky slice header.
-    if (!opts || opts.scroll !== false) card.scrollIntoView({ block: "nearest", inline: "nearest" });
+    // Include sticky headers and the selection outline in the visible bounds.
+    if (!opts || opts.scroll !== false) scrollCardFullyIntoView(card);
   }
 
   function scrollCardFullyIntoView(card) {
+    // Let the browser reveal the card first, then measure the resulting sticky
+    // header position. A second native scroll would undo these corrections.
+    card.scrollIntoView({ block: "nearest", inline: "nearest" });
     const pr = preview.getBoundingClientRect();
     const cr = card.getBoundingClientRect();
     const header = card.closest(".slice-column")?.querySelector(".slice-header");
     const hr = header ? header.getBoundingClientRect() : null;
-    const top = Math.max(pr.top, hr ? hr.bottom : pr.top) + 6;
-    const bottom = pr.bottom - 14;
+    const left = pr.left + preview.clientLeft + 6;
+    const right = pr.left + preview.clientLeft + preview.clientWidth - 6;
+    const top = Math.max(pr.top + preview.clientTop, hr ? hr.bottom : pr.top) + 6;
+    const bottom = pr.top + preview.clientTop + preview.clientHeight - 6;
 
-    if (cr.top < top) preview.scrollTop += cr.top - top;
-    else if (cr.bottom > bottom) preview.scrollTop += cr.bottom - bottom;
-
-    card.scrollIntoView({ block: "nearest", inline: "nearest" });
+    // Oversized cards cannot fit: keep an already visible portion steady and
+    // reveal the closest edge when the entire card is outside the usable area.
+    const offset = (start, end, min, max) => {
+      if (start < min && end > max) return 0;
+      if (start < min) return end - start > max - min ? end - max : start - min;
+      if (end > max) return end - start > max - min ? start - min : end - max;
+      return 0;
+    };
+    preview.scrollTop += offset(cr.top, cr.bottom, top, bottom);
+    preview.scrollLeft += offset(cr.left, cr.right, left, right);
   }
 
   // Slice columns as arrays of their cards. DOM order matches the visual layout:
@@ -868,7 +879,7 @@
           if (d < distance) { best = card; distance = d; }
         }
         selectCard(best);
-      } else if (dy < 0 && rowIndex === 0) scrollCardFullyIntoView(selectedEl);
+      } else scrollCardFullyIntoView(selectedEl);
       return;
     }
     const sibling = row[row.indexOf(selectedEl) + dx];
@@ -880,6 +891,7 @@
     for (let c = state.col + dx; c >= 0 && c < cols.length; c += dx) {
       if (cols[c].length) { selectCard(nearestCard(dx < 0 ? [...cols[c]].reverse() : cols[c], y)); return; }
     }
+    scrollCardFullyIntoView(selectedEl);
   }
 
   // Re-apply a selection captured before a re-render. Prefer the stable element
