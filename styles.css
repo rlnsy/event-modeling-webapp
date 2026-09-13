@@ -76,7 +76,6 @@ body {
 
 /* ---------- Top bar ---------- */
 .topbar {
-  /* Newer Safari samples viewport-attached headers for its toolbar tint. */
   position: sticky;
   top: 0;
   z-index: 10;
@@ -85,8 +84,8 @@ body {
   justify-content: space-between;
   gap: 16px;
   padding: 10px 16px;
-  background: var(--accent);
-  color: var(--accent-on);
+  background: var(--bg-elev);
+  color: var(--fg);
   border-bottom: 1px solid var(--line);
   flex: 0 0 auto;
 }
