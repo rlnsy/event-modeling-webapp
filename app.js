@@ -2463,7 +2463,7 @@
   // Reflect the active session's name in the browser tab title.
   function updateTitle() {
     const active = Sessions.get(activeId);
-    document.title = active ? active.name : "Event Modeling Tool";
+    document.title = active ? `${active.name} · Blueprint` : "Blueprint";
   }
 
   // Open a session: make it active, load its text, validate, refresh the select.
