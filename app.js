@@ -15,6 +15,8 @@
   const editorProblemsList = document.getElementById("editorProblemsList");
   const formatBtn = document.getElementById("formatBtn");
   const copyJsonBtn = document.getElementById("copyJsonBtn");
+  const importBtn = document.getElementById("importBtn");
+  const importFile = document.getElementById("importFile");
   const downloadBtn = document.getElementById("downloadBtn");
   const themeToggle = document.getElementById("themeToggle");
   const sessionSelect = document.getElementById("sessionSelect");
@@ -2496,6 +2498,43 @@
     if (activeId) Sessions.update(activeId, input.value);
   }
 
+  async function importJsonFile() {
+    const file = importFile.files[0];
+    // Reset immediately so selecting the same file again still fires change.
+    importFile.value = "";
+    if (!file) return;
+    importBtn.disabled = true;
+    try {
+      let text;
+      try {
+        text = (await file.text()).replace(/^\uFEFF/, "");
+      } catch (_) {
+        showToast("Could not read the file. Please try again.");
+        return;
+      }
+      let model;
+      try {
+        model = JSON.parse(text);
+      } catch (_) {
+        showToast("Import failed: the file does not contain valid JSON.");
+        return;
+      }
+      if (!model || typeof model !== "object" || Array.isArray(model)) {
+        showToast("Import failed: the JSON must contain a model object.");
+        return;
+      }
+      // Preserve edits that have not reached the debounced autosave yet.
+      clearTimeout(debounce);
+      saveActive();
+      const name = file.name.replace(/\.json$/i, "").trim() || "Imported model";
+      const session = Sessions.create(name, text);
+      loadSession(session.id);
+      showToast(`Imported ${file.name}`);
+    } finally {
+      importBtn.disabled = false;
+    }
+  }
+
   let sessionDialogAction = null;
 
   function openSessionDialog(action, session) {
@@ -2637,6 +2676,8 @@
 
   formatBtn.addEventListener("click", format);
   if (copyJsonBtn) copyJsonBtn.addEventListener("click", () => copyText(input.value, "JSON copied"));
+  importBtn.addEventListener("click", () => importFile.click());
+  importFile.addEventListener("change", importJsonFile);
   downloadBtn.addEventListener("click", downloadActive);
 
   // Open the active session (creating a seeded default on first run).
