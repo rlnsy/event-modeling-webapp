@@ -844,6 +844,27 @@
     };
   }
 
+  // A preview is display-only: image metadata stays with the original model.
+  function imagePreview(image) {
+    const wrap = document.createElement("div");
+    wrap.className = "modal-screen-image";
+    if (!image || !image.url) {
+      wrap.textContent = "(no image url)";
+      wrap.classList.add("img-missing");
+      return wrap;
+    }
+    const img = document.createElement("img");
+    img.className = "modal-screen-img";
+    img.alt = image.title || "Screen image";
+    img.addEventListener("error", () => {
+      wrap.textContent = "(image unavailable)";
+      wrap.classList.add("img-missing");
+    });
+    img.src = String(image.url);
+    wrap.appendChild(img);
+    return wrap;
+  }
+
   // ---------- Modal controller ----------
 
   const backdrop = document.getElementById("formBackdrop");
@@ -886,6 +907,13 @@
     if (submitBtn) submitBtn.textContent = editing ? "Save" : "Add";
     bodyEl.innerHTML = "";
     errorEl.textContent = "";
+
+    if (type === "screen" && editing && Array.isArray(opts.screenImages)) {
+      const previews = document.createElement("div");
+      previews.className = "modal-screen-images";
+      for (const image of opts.screenImages) previews.appendChild(imagePreview(image));
+      if (opts.screenImages.length) bodyEl.appendChild(previews);
+    }
 
     // key -> () => value, so simple inputs and the field editor read uniformly.
     const readers = {};
@@ -991,6 +1019,15 @@
         row.appendChild(el);
       }
       bodyEl.appendChild(row);
+      if (type === "screenImage" && spec.key === "url") {
+        const preview = document.createElement("div");
+        const updatePreview = () => {
+          preview.replaceChildren(imagePreview({ url: el.value.trim(), title: readers.title() }));
+        };
+        el.addEventListener("input", updatePreview);
+        updatePreview();
+        bodyEl.appendChild(preview);
+      }
     }
 
     if (type === "specification") {

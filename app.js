@@ -1397,6 +1397,7 @@
 
     const options = addOptions(ctx.formType, slice, snapshot) || {};
     options.initial = arr[idx];
+    if (ctx.formType === "screen") options.screenImages = asArray(slice.screenImages);
 
     closeDetail();
     AddForms.open(ctx.formType, (obj) => {
