@@ -14,6 +14,7 @@
   --line: #2f2f32;
   --accent: #4ea1ff;
   --accent-hover: #6cb2ff;
+  --accent-on: #101820;
   --ok: #43b97a;
   --warn: #cfa14a;
   --err: #ec6a5e;
@@ -37,8 +38,9 @@
   --fg-dim: #6b6b70;
   --fg-faint: #a0a0a5;
   --line: #e3e3e6;
-  --accent: #007aff;
-  --accent-hover: #0064d6;
+  --accent: #0068db;
+  --accent-hover: #0058bd;
+  --accent-on: #ffffff;
   --ok: #2f9e4f;
   --warn: #b8852b;
   --err: #df453a;
@@ -106,6 +108,10 @@ button {
 }
 button:hover { background: var(--btn-hover); }
 button:active { background: var(--btn-active); }
+:where(button, select, summary, a, input):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 button:disabled,
 button:disabled:hover {
   opacity: 0.4;
@@ -932,9 +938,12 @@ dialog.modal form {
 }
 .edit-toggle-btn:hover { background: var(--btn-hover); }
 .edit-toggle-btn.active {
-  background: var(--btn-active);
-  color: var(--fg);
-  border-color: transparent;
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-elev));
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.edit-toggle-btn.active:hover {
+  background: color-mix(in srgb, var(--accent) 24%, var(--bg-elev));
 }
 .edit-toggle-btn svg { width: 15px; height: 15px; }
 
@@ -959,9 +968,9 @@ body.editor-hidden .preview-empty {
 
 /* Shared look for the "+ Add Slice" button and the per-slice "+ Add" summary. */
 .add-btn {
-  background: var(--line);
-  color: var(--fg);
-  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-elev));
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
   border-radius: 6px;
   padding: 4px 9px;
   font-size: 12px;
@@ -969,7 +978,11 @@ body.editor-hidden .preview-empty {
   cursor: pointer;
   list-style: none;
 }
-.add-btn:hover { background: var(--btn-hover); }
+.add-btn:hover,
+.add-menu[open] > .add-btn {
+  background: color-mix(in srgb, var(--accent) 22%, var(--bg-elev));
+  border-color: var(--accent);
+}
 summary.add-btn { user-select: none; }
 summary.add-btn::-webkit-details-marker { display: none; }
 summary.add-btn::marker { content: ""; }
@@ -1108,13 +1121,17 @@ input[type="checkbox"].form-input {
   font-size: 12px;
   margin-right: auto;
 }
-.btn-primary {
-  background: var(--btn-active);
-  color: var(--fg);
+.btn-primary,
+#addSliceBtn {
+  background: var(--accent);
+  color: var(--accent-on);
   font-weight: 600;
   border: 0;
 }
-.btn-primary:hover { background: var(--btn-hover); }
+.btn-primary:hover:not(:disabled),
+#addSliceBtn:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-primary:disabled,
+#addSliceBtn:disabled { background: var(--line); color: var(--fg-dim); }
 .btn-secondary { background: var(--line); }
 .btn-danger {
   background: color-mix(in srgb, var(--err) 14%, transparent);
@@ -1204,14 +1221,17 @@ input[type="checkbox"].form-input {
 .add-field-btn {
   align-self: flex-start;
   background: transparent;
-  color: var(--fg-dim);
-  border: 1px dashed var(--line);
+  color: var(--accent);
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line));
   border-radius: 6px;
   padding: 5px 10px;
   font-size: 12px;
   font-weight: 600;
 }
-.add-field-btn:hover { background: var(--btn-hover); color: var(--fg); }
+.add-field-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-elev));
+  color: var(--accent-hover);
+}
 
 /* Nested object editing: a field item stacks its input row over an indented,
    collapsible subfield area, shown only for Custom-typed fields. */
