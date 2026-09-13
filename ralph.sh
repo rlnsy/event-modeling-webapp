@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MAX_ITERATIONS="${MAX_ITERATIONS:-100}"
+# Zero means keep running until interrupted.
+MAX_ITERATIONS="${MAX_ITERATIONS:-0}"
 SLEEP_SECONDS="${SLEEP_SECONDS:-2}"
+POLL_SECONDS="${POLL_SECONDS:-60}"
 
-PROMPT='
+for setting in MAX_ITERATIONS SLEEP_SECONDS POLL_SECONDS; do
+  if [[ ! "${!setting}" =~ ^(0|[1-9][0-9]*)$ ]]; then
+    echo "$setting must be a non-negative integer." >&2
+    exit 1
+  fi
+done
+
+command -v codex >/dev/null || { echo "codex is required." >&2; exit 1; }
+
+PROMPT="$(cat <<'EOF'
 Use the pad skill.
 
 Find the next available task and work on it.
@@ -24,34 +35,50 @@ Requirements:
 - If there are no actionable tasks remaining, output exactly:
 
 RALPH_DONE
-'
+EOF
+)"
 
-for ((i = 1; i <= MAX_ITERATIONS; i++)); do
+iteration_limit="$MAX_ITERATIONS"
+if ((MAX_ITERATIONS == 0)); then
+  iteration_limit="unlimited"
+fi
+
+for ((i = 1; MAX_ITERATIONS == 0 || i <= MAX_ITERATIONS; i++)); do
   echo
-  echo "=== Ralph iteration $i / $MAX_ITERATIONS ==="
+  echo "=== Ralph iteration $i (limit: $iteration_limit) ==="
   echo
 
   LAST_MESSAGE="$(mktemp)"
   trap 'rm -f "$LAST_MESSAGE"' EXIT
 
-  codex exec \
+  delay="$SLEEP_SECONDS"
+  if codex exec \
     --approve-for-me \
     --ephemeral \
     --output-last-message "$LAST_MESSAGE" \
-    "$PROMPT"
-
-  cat "$LAST_MESSAGE"
-
-  if grep -Fxq 'RALPH_DONE' "$LAST_MESSAGE"; then
-    echo
-    echo "No actionable tasks remain."
-    exit 0
+    "$PROMPT"; then
+    cat "$LAST_MESSAGE"
+    if grep -Fxq 'RALPH_DONE' "$LAST_MESSAGE"; then
+      echo
+      echo "No actionable tasks remain. Checking again in $POLL_SECONDS seconds."
+      delay="$POLL_SECONDS"
+    fi
+  else
+    status=$?
+    # Preserve interruption rather than retrying a cancelled session.
+    if ((status == 130 || status == 143)); then
+      exit "$status"
+    fi
+    echo "Codex exited with status $status. Retrying in $POLL_SECONDS seconds." >&2
+    delay="$POLL_SECONDS"
   fi
 
   rm -f "$LAST_MESSAGE"
   trap - EXIT
 
-  sleep "$SLEEP_SECONDS"
+  if ((MAX_ITERATIONS == 0 || i < MAX_ITERATIONS)); then
+    sleep "$delay"
+  fi
 done
 
 echo
