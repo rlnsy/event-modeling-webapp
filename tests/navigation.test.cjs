@@ -11,6 +11,7 @@ const navigation = source.slice(source.indexOf("  let selectedEl = null;"),
 
 function fixture(layout) {
   const cards = {};
+  const document = { activeElement: null };
   const columns = layout.map((lanes, colIndex) => {
     const column = { querySelectorAll: (selector) => selector === ".lane" ? rows : rows.flatMap((lane) => lane.cards) };
     const rows = lanes.map(({ names, horizontal = false }, laneIndex) => {
@@ -18,8 +19,9 @@ function fixture(layout) {
       lane.cards = names.map((name, index) => {
         const top = laneIndex * 200 + (horizontal ? 0 : index * 80);
         const left = colIndex * 600 + (horizontal ? index * 150 : 0);
-        const classes = new Set();
+        const classes = new Set(["card"]);
         const card = { name, classList: { add: value => classes.add(value), remove: value => classes.delete(value), contains: value => classes.has(value) }, scrollIntoView() {},
+          focus() { document.activeElement = card; }, blur() { document.activeElement = null; },
           closest: () => column, getBoundingClientRect: () => ({ top, bottom: top + 60, left, right: left + 120 }) };
         cards[name] = card;
         return card;
@@ -33,12 +35,13 @@ function fixture(layout) {
     preview: { querySelectorAll: () => columns },
     modelNavigator: { open: false },
     modalBackdrop: { hidden: true },
-    document: { addEventListener: (_, handler) => { keydown = handler; }, getElementById: () => null },
+    document: Object.assign(document, { addEventListener: (_, handler) => { keydown = handler; }, getElementById: () => null }),
   });
   vm.runInContext(navigation + "\n globalThis.nav = { selectCard, navKey, selected: () => selectedEl };", context);
   return {
     select: (name) => context.nav.selectCard(cards[name]),
     cards,
+    document,
     selected: () => context.nav.selected(),
     keydown: (key, target) => keydown({ key, target, preventDefault() {} }),
     press(key, expected) {
@@ -115,4 +118,28 @@ test("Escape in an input leaves diagram selection alone", () => {
   nav.keydown("Escape", { tagName: "INPUT" });
   assert.equal(nav.selected(), nav.cards.event2);
   assert.equal(nav.cards.event2.classList.contains("selected"), true);
+});
+
+
+test("arrow navigation moves clicked card focus with the selection", () => {
+  const nav = fixture(multiEventLayout);
+  nav.cards.event1.focus();
+  nav.select("event1");
+  nav.press("ArrowRight", "event2");
+  assert.equal(nav.document.activeElement, nav.cards.event2);
+  assert.equal(nav.cards.event1.classList.contains("selected"), false);
+  nav.press("j", "readmodel");
+  assert.equal(nav.document.activeElement, nav.cards.readmodel);
+  nav.keydown("Escape");
+  assert.equal(nav.document.activeElement, null);
+  assert.equal(nav.selected(), null);
+});
+
+test("selection does not steal focus from controls outside the diagram", () => {
+  const nav = fixture(multiEventLayout);
+  const control = { classList: { contains: () => false } };
+  nav.document.activeElement = control;
+  nav.select("event1");
+  nav.press("ArrowRight", "event2");
+  assert.equal(nav.document.activeElement, control);
 });

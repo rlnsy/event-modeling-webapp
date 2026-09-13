@@ -788,6 +788,11 @@
     if (selectedEl && selectedEl !== card) selectedEl.classList.remove("selected");
     selectedEl = card;
     card.classList.add("selected");
+    // Move existing card focus with selection so :focus-visible cannot leave
+    // a second highlight (or keyboard activation) on the previously clicked card.
+    if (document.activeElement?.classList.contains("card") && document.activeElement !== card) {
+      card.focus({ preventScroll: true });
+    }
     // `nearest` keeps the card on screen without fighting the sticky slice header.
     if (!opts || opts.scroll !== false) card.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
@@ -919,6 +924,7 @@
 
     if (e.key === "Escape" && selectedEl) {
       selectedEl.classList.remove("selected");
+      if (document.activeElement === selectedEl) selectedEl.blur();
       selectedEl = null;
       e.preventDefault();
       return;
